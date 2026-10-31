@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2F4BD8">
+<title>Board PYQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<style>
+:root{
+  box-sizing:border-box;
+  color-scheme:light;
+  --bg:#FFF6E8; --surface:#FFFFFF; --ink:#16204A; --muted:#58608C;
+  --doodles:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg opacity='.5' fill='none' stroke='%23C9B8E8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M30 40l4 9 10 1-8 6 3 10-9-5-9 5 3-10-8-6 10-1z'/%3E%3Cpath d='M140 30l24 24M136 34l-4 12 12-4'/%3E%3Ccircle cx='150' cy='140' r='9'/%3E%3Cpath d='M40 140h30M40 150h30M40 130h30'/%3E%3C/g%3E%3C/svg%3E");
+  --gold:#F5B700; --pink:#F06292; --shadow:rgba(47,75,216,.12);
+  --line:#E6D8F4; --accent:#2F4BD8; --accent-ink:#FFFFFF; --due:#E59A00; --due-soft:#FFF1D2;
+  --ok:#1F7A4D; --ok-soft:#DDF3E7; --bad:#B8362E; --bad-soft:#FBE3E0; --nav:#FFFFFF; --overlay:rgba(22,32,74,.55);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1538; --surface:#161F45; --ink:#E7ECF8; --muted:#9AA6CC;
+    --gold:#FFD54A; --pink:#FF8FB1; --shadow:rgba(0,0,0,.35);
+    --line:#2C3868; --accent:#7D93FF; --accent-ink:#0D1430; --due:#FFB938; --due-soft:#3A2C0C;
+    --ok:#5BD69A; --ok-soft:#123326; --bad:#FF8A80; --bad-soft:#3A1715; --nav:#141C3D; --doodles:none;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1538; --surface:#161F45; --ink:#E7ECF8; --muted:#9AA6CC;
+  --gold:#FFD54A; --pink:#FF8FB1; --shadow:rgba(0,0,0,.35);
+  --line:#2C3868; --accent:#7D93FF; --accent-ink:#0D1430; --due:#FFB938; --due-soft:#3A2C0C;
+  --ok:#5BD69A; --ok-soft:#123326; --bad:#FF8A80; --bad-soft:#3A1715; --nav:#141C3D; --doodles:none;
+}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+body{margin:0;background-color:var(--bg);background-image:var(--doodles);background-size:200px 200px;color:var(--ink);
+  font:400 1rem/1.55 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:680px;margin:0 auto;padding:calc(1.25rem + env(safe-area-inset-top,0px)) 1rem calc(6rem + env(safe-area-inset-bottom,0px))}
+.wrap.wide{max-width:1040px;padding-bottom:calc(2rem + env(safe-area-inset-bottom,0px))}
+h1,h2,h3{font-family:"Bricolage Grotesque","Atkinson Hyperlegible",system-ui,sans-serif;margin:0;line-height:1.15}
+h1{font-size:1.9rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.2rem;font-weight:700;margin:1.6rem 0 .6rem}
+h3{font-size:1.05rem}
+.sub{color:var(--muted);margin:.25rem 0 0}
+.small{font-size:.9rem;color:var(--muted)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:0;border-radius:10px;padding:.65rem 1rem;background:var(--accent);color:var(--accent-ink);font-weight:700;min-height:2.75rem}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.small{padding:.4rem .75rem;font-size:.92rem;min-height:2.2rem;color:var(--accent-ink)}
+.btn.ghost.small{color:var(--accent)}
+.btn.danger{background:var(--bad);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:700;padding:.25rem 0}
+.panel{background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:1rem;box-shadow:0 3px 0 var(--shadow)}
+.stack{display:flex;flex-direction:column;gap:.6rem}
+.row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:.75rem}
+.banner{background:var(--due-soft);border:1px solid var(--due);border-radius:10px;padding:.6rem .8rem;font-size:.92rem;margin-bottom:1rem}
+.pill{display:inline-block;font-size:.8rem;font-weight:700;border-radius:999px;padding:.1rem .55rem;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.due{background:var(--due-soft);border:1px solid var(--due)}
+.tag{font-size:.78rem;font-weight:700;border-radius:6px;padding:.05rem .45rem;background:var(--bg);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.seg{display:inline-flex;border:1.5px solid var(--accent);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:.4rem .9rem;font-weight:700;color:var(--accent);min-height:2.4rem}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:1rem}
+.who{text-align:right;font-size:.85rem;color:var(--muted)}
+/* home */
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.35rem 0;flex-wrap:wrap}
+.stepper{display:inline-flex;align-items:center;gap:.4rem}
+.stepper button{width:2.5rem;height:2.5rem;border-radius:10px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-weight:700;font-size:1.2rem;line-height:1}
+.stepper b{min-width:2ch;text-align:center;font-size:1.2rem}
+.unit{margin:1.4rem 0 .5rem;display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
+.unit h2{margin:0;font-size:1.05rem}
+.ch{display:grid;grid-template-columns:2.2rem 1fr auto;gap:.75rem;align-items:center;margin-bottom:.6rem}
+.chnum{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:1.5rem;color:var(--accent);line-height:1}
+.ch .nm{font-weight:700}
+.ch .st{color:var(--muted);font-size:.88rem}
+.meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:.3rem}
+.meter i{display:block;height:100%;background:var(--accent)}
+/* test */
+.testbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap}
+.timer{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:1.3rem;padding:.2rem .7rem;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-variant-numeric:tabular-nums}
+.timer.warn{border-color:var(--due);background:var(--due-soft);color:var(--due)}
+.timer.crit{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.layout{display:grid;grid-template-columns:1fr;gap:1rem}
+@media (min-width:900px){.layout{grid-template-columns:230px 1fr;align-items:start}.palbtn{display:none!important}.pal{display:block!important;position:sticky;top:1rem}}
+.pal{display:none}
+.pal.open{display:block}
+.pgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:.4rem}
+@media (max-width:420px){.pgrid{grid-template-columns:repeat(6,1fr)}}
+.pn{position:relative;border-radius:9px;border:2px solid var(--line);background:var(--bg);font-weight:700;min-height:2.6rem;padding:0}
+.pn.va{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.pn.an{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.pn.rv{background:var(--due-soft);border-color:var(--due);color:var(--ink)}
+.pn.ar{background:var(--ok-soft);border-color:var(--due);color:var(--ok)}
+.pn.rv::after,.pn.ar::after{content:"";position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--due)}
+.pn.cur{outline:3px solid var(--accent);outline-offset:1px}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:.3rem .5rem;margin-top:.8rem;font-size:.8rem;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:.35rem}
+.legend i{width:.9rem;height:.9rem;border-radius:4px;border:2px solid var(--line);background:var(--bg);flex:none}
+.legend i.va{background:var(--bad-soft);border-color:var(--bad)} .legend i.an{background:var(--ok-soft);border-color:var(--ok)}
+.legend i.rv{background:var(--due-soft);border-color:var(--due)} .legend i.ar{background:var(--ok-soft);border-color:var(--due)}
+.qhead{display:flex;justify-content:space-between;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem}
+.qbox{overflow-x:auto;overflow-y:hidden;font-size:1.1rem;font-weight:700;margin:.4rem 0 1rem;padding-bottom:.2rem}
+.qfig{max-width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:10px;margin:0 0 1rem;display:block}
+.opts{display:flex;flex-direction:column;gap:.6rem}
+.opt{display:flex;gap:.75rem;align-items:flex-start;text-align:left;width:100%;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:.8rem .9rem;min-height:3.2rem}
+.opt .k{font-weight:700;color:var(--muted);min-width:1.4rem;flex:none}
+.opt .ot{min-width:0;flex:1;overflow-x:auto;overflow-y:hidden}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));box-shadow:inset 0 0 0 1px var(--accent)}
+.opt[aria-pressed="true"] .k{color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt:disabled{cursor:default}
+.src{color:var(--muted);font-size:.85rem;margin-top:.9rem}
+.hintbox{margin-top:.75rem;color:var(--muted);font-style:italic;border-left:4px solid var(--due);padding:.3rem .7rem;background:var(--due-soft);border-radius:0 8px 8px 0}
+.navrow{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem;align-items:center}
+.navrow .grow{flex:1}
+.toggle[aria-pressed="true"]{background:var(--due-soft);border-color:var(--due);color:var(--ink)}
+/* result */
+.score{font-family:"Bricolage Grotesque",sans-serif;font-size:3.4rem;font-weight:700;line-height:1}
+.score small{font-size:1.2rem;color:var(--muted);font-weight:500}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.8rem;text-align:center}
+.stats div{background:var(--bg);border-radius:12px;padding:.5rem}
+.stats b{display:block;font-size:1.15rem}
+.rq{border-left:5px solid var(--bad);margin-bottom:.8rem}
+.rq.good{border-left-color:var(--ok)}
+.rq.slow{box-shadow:0 0 0 2px var(--due)}
+.rq .ex{color:var(--muted);font-size:.95rem;margin-top:.5rem;border-top:1px dashed var(--line);padding-top:.5rem}
+.rq .qbox{font-size:1rem}
+.note{font-size:.85rem;color:var(--due);margin-top:.3rem}
+.award{display:flex;align-items:center;gap:.9rem}
+.award .em{font-size:3.2rem;line-height:1}
+/* progress */
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem}
+.tbl th{text-align:left;color:var(--muted);font-weight:700;padding:.3rem .4rem;border-bottom:1.5px solid var(--line)}
+.tbl td{padding:.45rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}
+.tblwrap{overflow-x:auto}
+.att{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:.65rem .8rem;margin-bottom:.5rem}
+.att b{font-size:1.1rem}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr));gap:.6rem}
+.badge{background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:.6rem;text-align:center;box-shadow:0 3px 0 var(--shadow)}
+.badge span{display:block;font-size:2.4rem;line-height:1.2}
+.badge small{color:var(--muted);display:block}
+/* celebration */
+.gift-ov{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:var(--overlay);overflow:hidden;animation:ovin .25s ease-out}
+.gift-card{position:relative;z-index:2;width:min(92vw,360px);background:var(--surface);border:3px solid var(--accent);border-radius:26px;padding:1.4rem 1.2rem;text-align:center;animation:pop .55s cubic-bezier(.2,1.4,.4,1)}
+.gift-card.top{border-color:var(--gold);box-shadow:0 0 40px var(--gold)}
+.gift-card .t{font-family:"Bricolage Grotesque",sans-serif;font-size:1.7rem;font-weight:700;line-height:1.2}
+.gift-card p{margin:.3rem 0}
+.gift-emoji{display:inline-block;font-size:5.5rem;line-height:1.1;margin:.4rem 0;animation:bob 1.6s ease-in-out infinite}
+.gift-card.top .gift-emoji{filter:drop-shadow(0 0 14px var(--gold))}
+.confetti{position:absolute;inset:0;pointer-events:none;z-index:1}
+.confetti i{position:absolute;top:-14px;width:9px;height:14px;border-radius:2px;animation:fall linear forwards}
+.confetti i:nth-child(6n+1){background:var(--accent)} .confetti i:nth-child(6n+2){background:var(--pink)} .confetti i:nth-child(6n+3){background:var(--gold)}
+.confetti i:nth-child(6n+4){background:var(--ok)} .confetti i:nth-child(6n+5){background:var(--due)} .confetti i:nth-child(6n){background:var(--bad)}
+@keyframes ovin{from{opacity:0}to{opacity:1}}
+@keyframes pop{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-4deg)}}
+@keyframes fall{to{transform:translate(var(--dx),110vh) rotate(var(--rot))}}
+@media (prefers-reduced-motion: reduce){.gift-ov,.gift-card,.gift-emoji{animation:none}.confetti{display:none}}
+/* modal */
+.modal{position:fixed;inset:0;z-index:60;background:var(--overlay);display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal .panel{max-width:380px;width:100%}
+/* nav */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--nav);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+nav.tabs .in{max-width:680px;margin:0 auto;display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+nav.tabs button{background:none;border:0;padding:.7rem .2rem .8rem;font-weight:700;color:var(--muted);font-size:.92rem}
+nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
+.login{min-height:80vh;display:flex;flex-direction:column;justify-content:center;gap:1rem}
+.katex-display{margin:.4rem 0}
+</style>
+<script src="config.js"></script>
+<script src="questions.js"></script>
+</head>
+<body>
+<div class="wrap" id="app" aria-live="polite"><p class="sub">Loading…</p></div>
+<div id="navhost"></div>
+<div id="overlay"></div>
+<script type="module">
+"use strict";
+const CFG = window.APP_CONFIG, BANK = window.PYQ;
+const STUDENTS = CFG.students.map(s=>({...s, email:s.email.toLowerCase()}));
+const PARENTS = CFG.parentEmails.map(e=>e.toLowerCase());
+const FB_VER = "10.12.2";
+const APP_VERSION = "2026-10-31";
+const qs = new URLSearchParams(location.search);
+const isLocal = ["localhost","127.0.0.1","[::1]"].includes(location.hostname);
+const DEMO_FORCED = isLocal && qs.has("demo");
+const DEMO = DEMO_FORCED || String(CFG.firebase.apiKey||"").startsWith("PASTE");
+const app = document.getElementById("app");
+
+/* ================= helpers ================= */
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// Maths is LaTeX between $...$: even parts are plain text, odd parts go to KaTeX. "\n" is a line break.
+function mathHtml(s){
+  return String(s==null?"":s).split("$").map((part,i)=>{
+    if(i%2===0) return esc(part).replace(/\n/g,"<br>");
+    if(!window.katex) return esc(part);
+    return window.katex.renderToString(part,{throwOnError:false});
+  }).join("");
+}
+const BYID = new Map(BANK.questions.map(q=>[q.id,q]));
+const CHAPTER = n => BANK.chapters.find(c=>c.n===n);
+const qsOfChapter = n => BANK.questions.filter(q=>q.chapter===n);
+const fmtDate = ms => new Date(ms).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+const mmss = sec => { sec=Math.max(0,Math.round(sec)); return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0"); };
+const dur = sec => { sec=Math.round(sec); return sec>=60 ? Math.floor(sec/60)+" min "+(sec%60)+" s" : sec+" s"; };
+const pct = (a,b) => b ? Math.round(100*a/b) : 0;
+const awardFor = p => CFG.awards.find(a=>p>=a.min) || CFG.awards[CFG.awards.length-1];
+const awardByKey = k => CFG.awards.find(a=>a.key===k) || CFG.awards[CFG.awards.length-1];
+const todayStr = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const EXAM = {R:"Regular", C:"Compartment"};
+function sourceLine(q){
+  const S = q.sources||[]; if(!S.length) return "";
+  const [y,e,code,n] = S[0];
+  let t = `${y} ${EXAM[e]||e} · ${code} Q${n}`;
+  const rest = S.slice(1).map(([y2,e2,c2,n2]) => (y2===y&&e2===e) ? `${c2} Q${n2}` : `${y2} ${EXAM[e2]||e2} ${c2} Q${n2}`);
+  if(rest.length) t += " · also " + rest.join(", ");
+  return t;
+}
+
+/* ================= storage ================= */
+// Firestore layout: pyq/{email}/state/settings, pyq/{email}/state/stats, pyq/{email}/attempts/{autoId}
+function localStore(email){
+  const K = "board-pyq-v1:" + (email && email!==STUDENTS[0].email ? email+":" : "");
+  const get = k => { try{ const v=localStorage.getItem(K+k); return v?JSON.parse(v):null; }catch(e){ return null; } };
+  const set = (k,v) => { try{ localStorage.setItem(K+k, JSON.stringify(v)); }catch(e){} };
+  return {
+    async getSettings(){ return get("settings"); },
+    async saveSettings(s){ set("settings", s); },
+    async getStats(){ return get("stats"); },
+    async saveStats(s){ set("stats", s); },
+    async addAttempt(a){ const list=get("attempts")||[]; const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); list.push({...a,id}); set("attempts",list); return id; },
+    async listAttempts(){ return (get("attempts")||[]).slice().sort((x,y)=>y.startedAt-x.startedAt); }
+  };
+}
+async function firebaseStore(fs, db, email){
+  const base = "pyq/"+email;
+  return {
+    async getSettings(){ const s=await fs.getDoc(fs.doc(db, base+"/state/settings")); return s.exists()? s.data() : null; },
+    async saveSettings(x){ await fs.setDoc(fs.doc(db, base+"/state/settings"), x); },
+    async getStats(){ const s=await fs.getDoc(fs.doc(db, base+"/state/stats")); return s.exists()? s.data() : null; },
+    async saveStats(x){ await fs.setDoc(fs.doc(db, base+"/state/stats"), x); },
+    async addAttempt(a){ const r=await fs.addDoc(fs.collection(db, base+"/attempts"), a); return r.id; },
+    async listAttempts(){
+      const q = fs.query(fs.collection(db, base+"/attempts"), fs.orderBy("startedAt","desc"), fs.limit(500));
+      return (await fs.getDocs(q)).docs.map(d=>({...d.data(), id:d.id}));
+    }
+  };
+}
+
+/* ================= state ================= */
+let store=null, role=null, authApi=null, me=null, loginMsg="", currentStudent=null;
+let settings=null, stats=null, attempts=[];
+let view={tab:"home"};         // tab: home | progress | awards | test | result
+let test=null, tick=null, saveErr="";
+const blankStats = () => ({seen:{}, wrong:{}, correctStreak:{}, updatedAt:0});
+const studentName = () => (STUDENTS.find(x=>x.email===currentStudent)||STUDENTS[0]).name;
+
+async function loadAll(){
+  try{
+    const [s,st,at] = await Promise.all([store.getSettings(), store.getStats(), store.listAttempts()]);
+    settings = Object.assign({}, CFG.defaults, s||{});
+    stats = Object.assign(blankStats(), st||{});
+    attempts = at||[];
+  }catch(e){
+    console.error(e); saveErr="Could not load saved data. Check your internet connection.";
+    settings = Object.assign({}, CFG.defaults); stats = blankStats(); attempts = [];
+  }
+  settings.count = Math.min(CFG.maxCount, Math.max(CFG.minCount, +settings.count||CFG.defaults.count));
+  settings.timerOn = !!settings.timerOn;
+}
+let setTimer=null;
+function persistSettings(){
+  if(role!=="student") return;
+  clearTimeout(setTimer);
+  setTimer = setTimeout(async()=>{ try{ await store.saveSettings({count:settings.count, timerOn:settings.timerOn}); }catch(e){ console.error(e); saveErr="Could not save settings."; } }, 300);
+}
+
+/* ================= picking questions ================= */
+// Lowest `seen` first, ties random, so nothing repeats until the chapter is exhausted.
+// opts.mixWrong is reserved for a later "mix in questions I got wrong" option.
+function pickQuestions(chapter, count, opts={}){
+  const pool = qsOfChapter(chapter).map(q=>({q, r:Math.random(), s:(stats.seen[q.id]||0)}));
+  pool.sort((a,b)=>a.s-b.s || a.r-b.r);
+  return pool.slice(0, Math.min(count, pool.length)).map(x=>x.q);
+}
+
+/* ================= shell ================= */
+function setWide(w){ app.classList.toggle("wide", !!w); }
+function headerHtml(title, subtitle){
+  return `<div class="head"><div><h1>${esc(title)}</h1>${subtitle?`<p class="sub">${esc(subtitle)}</p>`:""}</div>
+    <div class="who">${esc(role==="parent" ? "Parent view" : studentName())}${(!DEMO && me)?`<br><button class="linkbtn" id="signout">Sign out</button>`:""}</div></div>
+    ${role==="parent" ? `<p class="banner">Read-only view of ${esc(studentName())}'s practice.</p>` : ""}
+    ${saveErr?`<p class="banner" id="saveerr">${esc(saveErr)}</p>`:""}`;
+}
+function bindHeader(){ const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
+function renderNav(){
+  const host=document.getElementById("navhost");
+  if(view.tab==="test"){ host.innerHTML=""; return; }
+  const tabs = role==="parent" ? [["progress","Progress"],["awards","Awards"]] : [["home","Practice"],["progress","Progress"],["awards","My awards"]];
+  const cur = view.tab==="result" ? (view.from||"progress") : view.tab;
+  host.innerHTML = `<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button data-tab="${k}" ${cur===k?'aria-current="page"':""}>${l}</button>`).join("")}</div></nav>`;
+  host.querySelectorAll("button").forEach(b=>b.onclick=()=>{ go(b.dataset.tab); });
+}
+function go(tab, extra){ view = Object.assign({tab}, extra||{}); render(); window.scrollTo(0,0); }
+function render(){
+  if(role==="parent" && view.tab==="home") view={tab:"progress"};
+  setWide(view.tab==="test");
+  if(view.tab==="test") renderTest();
+  else if(view.tab==="result") renderResult();
+  else if(view.tab==="progress") renderProgress();
+  else if(view.tab==="awards") renderAwards();
+  else renderHome();
+  renderNav(); bindHeader();
+}
+function showLogin(msg){
+  setWide(false); document.getElementById("navhost").innerHTML="";
+  app.innerHTML = `<div class="login"><div><h1>Board PYQ</h1><p class="sub">Real board-exam MCQs, chapter by chapter.</p></div>
+    ${msg?`<p class="banner">${esc(msg)}</p>`:""}<button class="btn" id="gsign">Sign in with Google</button></div>`;
+  document.getElementById("gsign").onclick=()=>authApi.signIn();
+}
+
+/* ================= home ================= */
+function chapterStats(n){
+  const all = qsOfChapter(n), seen = all.filter(q=>stats.seen[q.id]>0).length;
+  const list = attempts.filter(a=>a.chapter===n);
+  return {total:all.length, seen, tests:list.length, last:list[0]||null, best:list.reduce((m,a)=>Math.max(m,pct(a.score,a.total)),0), list};
+}
+function renderHome(){
+  const units = []; BANK.chapters.forEach(c=>{ let u=units.find(x=>x.unit===c.unit); if(!u){ u={unit:c.unit,name:c.unitName,marks:c.unitMarks,items:[]}; units.push(u); } u.items.push(c); });
+  app.innerHTML = headerHtml("Board PYQ","Class 12 Maths · real board questions") + `
+  <div class="panel stack">
+    <div class="setrow"><span><b>Questions per test</b><br><span class="small">${CFG.minCount} to ${CFG.maxCount}</span></span>
+      <span class="stepper"><button id="dec" aria-label="Fewer questions">−</button><b id="cnt">${settings.count}</b><button id="inc" aria-label="More questions">+</button></span></div>
+    <div class="setrow"><span><b>Timer</b><br><span class="small">${CFG.secondsPerQuestion} s per question, whole test</span></span>
+      <span class="seg" role="group" aria-label="Timer"><button data-t="0" aria-pressed="${!settings.timerOn}">Off</button><button data-t="1" aria-pressed="${settings.timerOn}">On</button></span></div>
+  </div>` + units.map(u=>`
+  <div class="unit"><h2>Unit ${esc(u.unit)} · ${esc(u.name)}</h2><span class="small">${u.marks} marks</span></div>
+  ${u.items.map(c=>{ const s=chapterStats(c.n);
+    const last = s.last ? `Last: ${s.last.score}/${s.last.total}` : "No tests yet";
+    return `<div class="panel ch"><div class="chnum">${c.n}</div>
+      <div><div class="nm">${esc(c.t)}</div><div class="st">${s.total} questions · seen ${s.seen} · ${last}</div>
+      <div class="meter" aria-hidden="true"><i style="width:${pct(s.seen,s.total)}%"></i></div></div>
+      <button class="btn small" data-start="${c.n}" aria-label="Start test: ${esc(c.t)}">Start</button></div>`; }).join("")}`).join("")
+  + `<p class="small" style="text-align:center;margin-top:2rem">Board PYQ, version ${APP_VERSION}</p>`;
+  const setCount = n => { settings.count=Math.min(CFG.maxCount,Math.max(CFG.minCount,n)); document.getElementById("cnt").textContent=settings.count; persistSettings(); };
+  document.getElementById("dec").onclick=()=>setCount(settings.count-1);
+  document.getElementById("inc").onclick=()=>setCount(settings.count+1);
+  app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{ settings.timerOn=b.dataset.t==="1"; persistSettings(); render(); });
+  app.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>startTest(+b.dataset.start));
+}
+
+/* ================= test ================= */
+function startTest(chapter){
+  const picked = pickQuestions(chapter, settings.count);
+  if(!picked.length) return;
+  const now = Date.now();
+  test = { chapter, qs:picked, idx:0, answers:{}, visited:new Set([picked[0].id]), review:new Set(), hint:new Set(), time:{}, shownHint:false,
+    startedAt:now, enteredAt:now, timerOn:settings.timerOn, limit: settings.timerOn ? picked.length*(CFG.secondsPerQuestion||90) : 0,
+    paletteOpen:false, submitted:false };
+  clearInterval(tick);
+  if(test.timerOn) tick = setInterval(timerTick, 500);
+  go("test");
+}
+function bankTime(){ // add the time spent on the current question since it was shown
+  if(!test) return; const now=Date.now(), id=test.qs[test.idx].id;
+  test.time[id] = (test.time[id]||0) + (now-test.enteredAt)/1000; test.enteredAt=now;
+}
+function jump(i){
+  if(!test || test.submitted || i<0 || i>=test.qs.length) return;
+  bankTime(); test.idx=i; test.visited.add(test.qs[i].id); test.shownHint=false; test.paletteOpen=false; renderTest();
+}
+function paletteState(q){
+  const a = test.answers[q.id]!=null, r = test.review.has(q.id);
+  return a&&r ? "ar" : r ? "rv" : a ? "an" : test.visited.has(q.id) ? "va" : "nv";
+}
+function paletteHtml(){
+  return `<div class="panel pal ${test.paletteOpen?"open":""}" id="pal"><h3 style="margin-bottom:.6rem">Questions</h3>
+    <div class="pgrid">${test.qs.map((q,i)=>`<button class="pn ${paletteState(q)} ${i===test.idx?"cur":""}" data-j="${i}" aria-label="Question ${i+1}, ${({nv:"not visited",va:"not answered",an:"answered",rv:"marked for review",ar:"answered and marked for review"})[paletteState(q)]}" ${i===test.idx?'aria-current="true"':""}>${i+1}</button>`).join("")}</div>
+    <div class="legend"><span><i></i>Not visited</span><span><i class="va"></i>Not answered</span><span><i class="an"></i>Answered</span><span><i class="rv"></i>Marked for review</span><span><i class="ar"></i>Answered + review</span></div></div>`;
+}
+function renderTest(){
+  if(!test){ go("home"); return; }
+  const q=test.qs[test.idx], last=test.idx===test.qs.length-1, sel=test.answers[q.id];
+  const ch=CHAPTER(test.chapter);
+  app.innerHTML = `
+  <div class="testbar">
+    <div><b>${esc(ch.t)}</b><br><span class="small">Question ${test.idx+1} of ${test.qs.length}</span></div>
+    <div class="row">${test.timerOn?`<span class="timer" id="tm" role="timer">${mmss(timeLeft())}</span>`:""}
+      <button class="btn ghost small palbtn" id="palbtn" aria-expanded="${test.paletteOpen}" aria-controls="pal">Questions ▾</button>
+      <button class="btn ghost small" id="exit">Exit</button></div>
+  </div>
+  <div class="layout">
+    ${paletteHtml()}
+    <div class="panel">
+      <div class="qhead"><span class="tag">${q.type==="ar"?"Assertion–Reason":"MCQ"}</span><button class="btn ghost small toggle" id="rv" aria-pressed="${test.review.has(q.id)}">${test.review.has(q.id)?"★ Marked for review":"☆ Mark for review"}</button></div>
+      <div class="qbox">${mathHtml(q.text)}</div>
+      ${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure for question ${test.idx+1}">`:""}
+      <div class="opts" role="group" aria-label="Options">${["A","B","C","D"].map(k=>q.options[k]==null?"":`<button class="opt" data-k="${k}" aria-pressed="${sel===k}"><span class="k">${k}</span><span class="ot">${mathHtml(q.options[k])}</span></button>`).join("")}</div>
+      <div id="hintslot">${test.shownHint?`<div class="hintbox">${mathHtml(q.hint||"No hint for this one.")}</div>`:""}</div>
+      <div class="src">${esc(sourceLine(q))}</div>
+      <div class="navrow">
+        <button class="btn ghost" id="prev" ${test.idx===0?"disabled":""}>← Previous</button>
+        <button class="btn ghost" id="next" ${last?"disabled":""}>Next →</button>
+        <button class="btn ghost small" id="hint">💡 Hint</button>
+        ${sel!=null?`<button class="linkbtn" id="clear">Clear answer</button>`:""}
+        <span class="grow"></span>
+        <button class="btn" id="done">Done</button>
+      </div>
+    </div>
+  </div>`;
+  app.querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>jump(+b.dataset.j));
+  app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{ test.answers[q.id]=b.dataset.k; renderTest(); });
+  const on=(id,fn)=>{ const el=document.getElementById(id); if(el) el.onclick=fn; };
+  on("clear",()=>{ delete test.answers[q.id]; renderTest(); });
+  on("rv",()=>{ test.review.has(q.id)?test.review.delete(q.id):test.review.add(q.id); renderTest(); });
+  on("hint",()=>{ test.hint.add(q.id); test.shownHint=true; renderTest(); });
+  on("prev",()=>jump(test.idx-1)); on("next",()=>jump(test.idx+1));
+  on("palbtn",()=>{ test.paletteOpen=!test.paletteOpen; renderTest(); });
+  on("exit",()=>confirmBox("Leave this test?","It will not be saved and your progress will not change.","Leave test","Keep going",()=>{ clearInterval(tick); test=null; go("home"); }, true));
+  on("done",()=>{
+    bankTime();
+    const un=test.qs.filter(x=>test.answers[x.id]==null).length, rv=test.review.size;
+    if(!un && !rv) return finishTest(false);
+    const parts=[]; if(un) parts.push(`${un} unanswered`); if(rv) parts.push(`${rv} marked for review`);
+    confirmBox("Submit the test?", `You still have ${parts.join(" and ")}.`, "Submit", "Go back", ()=>finishTest(false));
+  });
+}
+const timeLeft = () => Math.max(0, test.limit - (Date.now()-test.startedAt)/1000);
+function timerTick(){
+  if(!test || !test.timerOn || test.submitted){ clearInterval(tick); return; }
+  const left=timeLeft(), el=document.getElementById("tm");
+  if(el){ el.textContent=mmss(left); el.classList.toggle("crit", left<=test.limit*.1); el.classList.toggle("warn", left<=test.limit*.2 && left>test.limit*.1); }
+  if(left<=0){ bankTime(); finishTest(true); }
+}
+function confirmBox(title, text, yes, no, onYes, danger){
+  const host=document.getElementById("overlay");
+  host.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="panel stack"><h3>${esc(title)}</h3><p style="margin:0">${esc(text)}</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="cno">${esc(no)}</button><button class="btn ${danger?"danger":""}" id="cyes">${esc(yes)}</button></div></div></div>`;
+  document.getElementById("cno").focus();
+  document.getElementById("cno").onclick=()=>{ host.innerHTML=""; };
+  document.getElementById("cyes").onclick=()=>{ host.innerHTML=""; onYes(); };
+}
+
+async function finishTest(timedOut){
+  if(!test || test.submitted) return;
+  test.submitted=true; clearInterval(tick);
+  document.getElementById("overlay").innerHTML="";
+  const t=test, finishedAt=Date.now();
+  const items = t.qs.map(q=>{ const ch=t.answers[q.id]; return {id:q.id, chosen:ch==null?null:ch, correct:ch===q.answer, timeSec:Math.round((t.time[q.id]||0)*10)/10, hintUsed:t.hint.has(q.id), review:t.review.has(q.id)}; });
+  const score = items.filter(i=>i.correct).length, total=items.length;
+  const award = awardFor(pct(score,total));
+  const attempt = {chapter:t.chapter, startedAt:t.startedAt, finishedAt, count:total, timerOn:t.timerOn, timeLimitSec:t.limit, timedOut:!!timedOut, score, total, award:award.key, items};
+  // stats
+  const day=todayStr();
+  for(const it of items){
+    stats.seen[it.id]=(stats.seen[it.id]||0)+1;
+    if(it.correct){
+      if(stats.wrong[it.id]){
+        stats.correctStreak[it.id]=(stats.correctStreak[it.id]||0)+1;
+        if(stats.correctStreak[it.id]>=2){ delete stats.wrong[it.id]; delete stats.correctStreak[it.id]; }
+      }
+    } else {
+      const w=stats.wrong[it.id]||{count:0,last:day}; w.count++; w.last=day; stats.wrong[it.id]=w; stats.correctStreak[it.id]=0;
+    }
+  }
+  stats.updatedAt=Date.now();
+  try{
+    attempt.id = await store.addAttempt(attempt);
+    await store.saveStats(JSON.parse(JSON.stringify(stats)));
+    saveErr="";
+  }catch(e){ console.error(e); saveErr="Could not save this result. Check your internet connection."; attempt.id = attempt.id||("local"+Date.now()); }
+  attempts.unshift(attempt); attempts.sort((a,b)=>b.startedAt-a.startedAt);
+  test=null;
+  go("result",{attempt, fresh:true, timedOut:!!timedOut, from:"home"});
+  celebrate(award);
+}
+
+/* ================= result ================= */
+function renderResult(){
+  const a=view.attempt, ch=CHAPTER(a.chapter), award=awardByKey(a.award);
+  const spent=a.items.reduce((s,i)=>s+(i.timeSec||0),0), avg=spent/Math.max(1,a.items.length);
+  const wrongN=a.items.filter(i=>i.chosen!=null&&!i.correct).length, skipN=a.items.filter(i=>i.chosen==null).length;
+  app.innerHTML = headerHtml("Result", `${ch.t} · ${fmtDate(a.startedAt)}`) +
+  (view.timedOut||a.timedOut?`<p class="banner"><b>Time's up.</b> The test was submitted automatically.</p>`:"") +
+  `<div class="panel"><div class="spread"><div class="score">${a.score}<small> / ${a.total}</small></div>
+      <div class="award"><span class="em" aria-hidden="true">${award.icon}</span><div><b>${esc(award.name)}</b><br><span class="small">${pct(a.score,a.total)}%</span></div></div></div>
+    <div class="stats"><div><b>${dur(spent)}</b><span class="small">Total time</span></div><div><b>${dur(avg)}</b><span class="small">Per question</span></div><div><b>${wrongN} wrong · ${skipN} skipped</b><span class="small">Mistakes</span></div></div></div>
+  <h2>Every question</h2>
+  ${a.items.map((it,i)=>{ const q=BYID.get(it.id); if(!q) return "";
+    const slow = it.timeSec>=30 && it.timeSec>2*avg;
+    const mine = it.chosen==null ? "Not answered" : `${it.chosen}. ${q.options[it.chosen]}`;
+    return `<div class="panel rq ${it.correct?"good":""} ${slow?"slow":""}">
+      <div class="spread"><b>Q${i+1}</b><span class="row"><span class="pill ${it.correct?"ok":"bad"}">${it.correct?"Correct":(it.chosen==null?"Not answered":"Wrong")}</span>
+        <span class="pill due" ${slow?"":'style="background:none;border-color:var(--line)"'}>${slow?"⏱ Took long · ":"⏱ "}${dur(it.timeSec)}</span>${it.hintUsed?'<span class="tag">Hint used</span>':""}</span></div>
+      <div class="qbox">${mathHtml(q.text)}</div>
+      ${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure for question ${i+1}">`:""}
+      <p style="margin:.3rem 0"><b>Her answer:</b> <span style="color:${it.correct?"var(--ok)":"var(--bad)"}">${it.chosen==null?"Not answered":esc(it.chosen)+". "+mathHtml(q.options[it.chosen])}</span></p>
+      ${it.correct?"":`<p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>`}
+      <div class="ex">${mathHtml(q.explanation||"")}${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>
+      <div class="src">${esc(sourceLine(q))}</div></div>`; }).join("")}
+  <div class="row" style="margin-top:1rem">${role==="student"?`<button class="btn" id="again">Practice again</button>`:""}<button class="btn ghost" id="back">${view.from==="progress"?"Back to progress":(role==="student"?"Back to chapters":"Back")}</button></div>`;
+  const again=document.getElementById("again"); if(again) again.onclick=()=>startTest(a.chapter);
+  document.getElementById("back").onclick=()=>go(view.from==="progress"||role==="parent"?"progress":"home");
+}
+function celebrate(award){
+  const host=document.getElementById("overlay"), top=award.min>=80;
+  host.innerHTML = `<div class="gift-ov" role="dialog" aria-modal="true" aria-label="Award"><div class="confetti" aria-hidden="true"></div>
+    <div class="gift-card ${top?"top":""}"><div class="t">${esc(award.name)}</div><div class="gift-emoji" aria-hidden="true">${award.icon}</div><p>${esc(award.line)}</p>
+    <button class="btn" id="aok" style="margin-top:.6rem">Continue</button></div></div>`;
+  const close=()=>{ host.innerHTML=""; };
+  document.getElementById("aok").onclick=close; document.getElementById("aok").focus();
+  host.querySelector(".gift-ov").addEventListener("click",e=>{ if(e.target.classList.contains("gift-ov")) close(); });
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box=host.querySelector(".confetti"), r=Math.random, n = award.min>=100?90 : award.min>=80?60 : award.min>=60?40 : award.min>=40?25 : 12;
+  for(let i=0;i<n;i++){ const p=document.createElement("i");
+    p.style.left=(r()*100)+"%"; p.style.setProperty("--dx",((r()-.5)*160)+"px"); p.style.setProperty("--rot",(r()*720)+"deg");
+    p.style.animationDuration=(2.2+r()*2.2)+"s"; p.style.animationDelay=(r()*.8)+"s"; box.appendChild(p); }
+}
+
+/* ================= progress ================= */
+function renderProgress(){
+  const rows = BANK.chapters.map(c=>{ const s=chapterStats(c.n);
+    const items=s.list.flatMap(a=>a.items), right=items.filter(i=>i.correct).length;
+    const t=items.reduce((x,i)=>x+(i.timeSec||0),0);
+    return {c, s, acc: items.length?pct(right,items.length):null, avg: items.length? t/items.length : null}; });
+  const done = rows.filter(r=>r.s.tests);
+  // wrong most often, from every attempt
+  const wm = new Map();
+  for(const a of attempts) for(const it of a.items) if(!it.correct){ const e=wm.get(it.id)||{n:0,ans:[]}; e.n++; e.ans.push(it.chosen); wm.set(it.id,e); }
+  const worst=[...wm.entries()].sort((a,b)=>b[1].n-a[1].n).slice(0,15);
+  app.innerHTML = headerHtml("Progress", `${attempts.length} test${attempts.length===1?"":"s"} so far`) +
+  (done.length ? `<div class="panel tblwrap"><table class="tbl"><thead><tr><th>Chapter</th><th>Tests</th><th>Best</th><th>Last</th><th>Accuracy</th><th>Avg time</th><th>Seen</th></tr></thead><tbody>
+    ${done.map(r=>`<tr><td>${r.c.n}. ${esc(r.c.t)}</td><td>${r.s.tests}</td><td>${r.s.best}%</td><td>${r.s.last.score}/${r.s.last.total}</td><td>${r.acc}%</td><td>${dur(r.avg)}</td><td>${r.s.seen}/${r.s.total}</td></tr>`).join("")}</tbody></table></div>`
+    : `<p class="panel">No tests yet.</p>`) +
+  (role==="parent" ? `<h2>Missed most often</h2>` + (worst.length ? worst.map(([id,e])=>{ const q=BYID.get(id); if(!q) return "";
+      const given=e.ans.map(x=>x==null?"–":x).join(", ");
+      return `<div class="panel rq" style="margin-bottom:.6rem"><div class="spread"><b>${esc(id)} · ${esc(CHAPTER(q.chapter).t)}</b><span class="pill bad">Missed ${e.n}×</span></div>
+        <div class="qbox">${mathHtml(q.text)}</div>${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure">`:""}
+        <p style="margin:.2rem 0"><b>Her answers:</b> ${esc(given)} · <b>Correct:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>
+        <div class="src">${esc(sourceLine(q))}</div></div>`; }).join("") : `<p class="panel">Nothing missed yet.</p>`) : "") +
+  `<h2>Past tests</h2>` + (attempts.length ? attempts.map((a,i)=>{ const aw=awardByKey(a.award);
+    return `<button class="att" data-a="${i}"><span><b>${a.score}/${a.total}</b> · ${esc(CHAPTER(a.chapter).t)}<br><span class="small">${fmtDate(a.startedAt)}${a.timerOn?" · timed":""}${a.timedOut?" · time's up":""}</span></span><span style="font-size:1.8rem" aria-hidden="true">${aw.icon}</span></button>`; }).join("") : `<p class="small">Nothing here yet.</p>`);
+  app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"progress"}));
+}
+function renderAwards(){
+  const counts={}; attempts.forEach(a=>{ counts[a.award]=(counts[a.award]||0)+1; });
+  app.innerHTML = headerHtml("My awards", `${attempts.length} earned`) +
+  (attempts.length ? `<div class="row" style="margin-bottom:1rem">${CFG.awards.filter(a=>counts[a.key]).map(a=>`<span class="pill due">${a.icon} ${counts[a.key]}</span>`).join("")}</div>
+    <div class="badges">${attempts.map((a,i)=>{ const aw=awardByKey(a.award);
+      return `<button class="badge" data-a="${i}" style="font:inherit;color:inherit;cursor:pointer"><span aria-hidden="true">${aw.icon}</span><b>${esc(aw.name)}</b><small>${a.score}/${a.total} · Ch ${a.chapter}</small><small>${fmtDate(a.startedAt)}</small></button>`; }).join("")}</div>`
+    : `<p class="panel">Finish a test to earn your first award.</p>`);
+  app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"awards"}));
+}
+
+/* ================= boot ================= */
+async function startAs(r){
+  role=r; await loadAll();
+  view={tab: r==="parent"?"progress":"home"}; render();
+}
+async function boot(){
+  if(DEMO){
+    const asParent = DEMO_FORCED && qs.get("demo")==="parent";
+    currentStudent=STUDENTS[0].email; store=localStore(currentStudent); me=null;
+    return startAs(asParent?"parent":"student");
+  }
+  try{
+    const fa=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`);
+    const au=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth.js`);
+    const fs=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`);
+    const fapp=fa.initializeApp(CFG.firebase), auth=au.getAuth(fapp), db=fs.getFirestore(fapp);
+    authApi={
+      signIn: async()=>{ const p=new au.GoogleAuthProvider(); p.setCustomParameters({prompt:"select_account"});
+        try{ await au.signInWithPopup(auth,p); }catch(e){ if(e && (e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment")) await au.signInWithRedirect(auth,p); else showLogin("Sign-in did not complete. Please try again."); } },
+      signOut: async()=>{ await au.signOut(auth); }
+    };
+    au.onAuthStateChanged(auth, async user=>{
+      role=null; currentStudent=null; clearInterval(tick); test=null; document.getElementById("overlay").innerHTML="";
+      if(!user){ me=null; const m=loginMsg; loginMsg=""; return showLogin(m); }
+      me=user; const email=(user.email||"").toLowerCase();
+      if(STUDENTS.some(x=>x.email===email)){ currentStudent=email; store=await firebaseStore(fs,db,email); return startAs("student"); }
+      if(PARENTS.includes(email)){ currentStudent=STUDENTS[0].email; store=await firebaseStore(fs,db,currentStudent); return startAs("parent"); }
+      loginMsg=`${email} is not set up for this app. Sign in with the student or parent Google account.`;
+      await au.signOut(auth);
+    });
+  }catch(e){ console.error(e); app.innerHTML=`<p class="banner">Could not load. Check your internet connection and the Firebase settings in config.js.</p>`; }
+}
+boot();
+</script>
+</body>
+</html>

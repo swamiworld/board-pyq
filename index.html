@@ -191,7 +191,8 @@ nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 
 "use strict";
 const CFG = window.APP_CONFIG, BANK = window.PYQ;
 const STUDENTS = CFG.students.map(s=>({...s, email:s.email.toLowerCase()}));
-const PARENTS = CFG.parentEmails.map(e=>e.toLowerCase());
+const ADMIN = CFG.adminEmail.toLowerCase();
+const SEED_PARENT = (CFG.parentEmails[0]||CFG.adminEmail).toLowerCase();   // first-run roster seed only
 const FB_VER = "10.12.2";
 const APP_VERSION = "2026-10-31";
 const qs = new URLSearchParams(location.search);
@@ -272,13 +273,49 @@ async function firebaseStore(fs, db, email){
   };
 }
 
+/* ================= roster (families) ================= */
+// Firestore: pyqParents/{email} {name}, pyqStudents/{email} {name, parent}. The admin is always a parent and needs no document.
+function localRoster(){
+  const K="board-pyq-v1:roster";
+  const get=()=>{ try{ const v=JSON.parse(localStorage.getItem(K)); if(v) return v; }catch(e){} const r={parents:{},students:{}}; STUDENTS.forEach(x=>{ r.students[x.email]={name:x.name,parent:SEED_PARENT}; }); return r; };
+  const set=r=>{ try{ localStorage.setItem(K,JSON.stringify(r)); }catch(e){} };
+  const list=o=>Object.entries(o).map(([email,v])=>({email,...v}));
+  return {
+    async getStudent(e){ const r=get().students[e]; return r?{email:e,...r}:null; },
+    async getParent(e){ const r=get().parents[e]; return r?{email:e,...r}:null; },
+    async kidsOf(p){ return list(get().students).filter(x=>x.parent===p); },
+    async allStudents(){ return list(get().students); },
+    async allParents(){ return list(get().parents); },
+    async setStudent(e,v){ const r=get(); r.students[e]=v; set(r); },
+    async deleteStudent(e){ const r=get(); delete r.students[e]; set(r); },
+    async setParent(e,v){ const r=get(); r.parents[e]=v; set(r); },
+    async deleteParent(e){ const r=get(); delete r.parents[e]; set(r); },
+    async seed(){}
+  };
+}
+function firebaseRoster(fs, db){
+  const one=async(c,e)=>{ const x=await fs.getDoc(fs.doc(db,c+"/"+e)); return x.exists()?{email:e,...x.data()}:null; };
+  const all=async(q)=>(await fs.getDocs(q)).docs.map(d=>({email:d.id,...d.data()}));
+  return {
+    getStudent:e=>one("pyqStudents",e), getParent:e=>one("pyqParents",e),
+    kidsOf:p=>all(fs.query(fs.collection(db,"pyqStudents"), fs.where("parent","==",p))),
+    allStudents:()=>all(fs.collection(db,"pyqStudents")), allParents:()=>all(fs.collection(db,"pyqParents")),
+    setStudent:(e,v)=>fs.setDoc(fs.doc(db,"pyqStudents/"+e),v), deleteStudent:e=>fs.deleteDoc(fs.doc(db,"pyqStudents/"+e)),
+    setParent:(e,v)=>fs.setDoc(fs.doc(db,"pyqParents/"+e),v), deleteParent:e=>fs.deleteDoc(fs.doc(db,"pyqParents/"+e)),
+    // first admin sign-in: copy the students in config.js into the roster (under the first parent in config.js)
+    async seed(){ if(SEED_PARENT!==ADMIN) return;
+      for(const x of STUDENTS){ if(!(await one("pyqStudents",x.email))) await fs.setDoc(fs.doc(db,"pyqStudents/"+x.email),{name:x.name,parent:SEED_PARENT}); } }
+  };
+}
+
 /* ================= state ================= */
 let store=null, role=null, authApi=null, me=null, loginMsg="", currentStudent=null;
+let roster=null, makeStore=null, kids=[], isAdmin=false, myEmail="";   // kids: the students on screen (one for a student, her children for a parent)
 let settings=null, stats=null, attempts=[];
 let view={tab:"home"};         // tab: home | progress | awards | test | result
 let test=null, tick=null, saveErr="", notice="";
 const blankStats = () => ({seen:{}, wrong:{}, correctStreak:{}, updatedAt:0});
-const studentName = () => (STUDENTS.find(x=>x.email===currentStudent)||STUDENTS[0]).name;
+const studentName = () => (kids.find(x=>x.email===currentStudent)||{name:"Student"}).name;
 
 async function loadAll(){
   try{
@@ -313,28 +350,29 @@ function pickQuestions(chapter, count, opts={}){
 function setWide(w){ app.classList.toggle("wide", !!w); }
 function headerHtml(title, subtitle){
   return `<div class="head"><div><h1>${esc(title)}</h1>${subtitle?`<p class="sub">${esc(subtitle)}</p>`:""}</div>
-    <div class="who">${esc(role==="parent" ? "Parent view" : studentName())}${(!DEMO && me)?`<br><button class="linkbtn" id="signout">Sign out</button>`:""}<br><label class="small">Theme <select id="theme" class="themesel">${THEMES.map(([k,l])=>`<option value="${k}" ${getTheme()===k?"selected":""}>${l}</option>`).join("")}</select></label></div></div>
-    ${role==="parent" ? `<p class="banner">Read-only view of ${esc(studentName())}'s practice.</p>` : ""}
+    <div class="who">${esc(role==="parent" ? (isAdmin?"Admin":"Parent view") : studentName())}${(!DEMO && me)?`<br><button class="linkbtn" id="signout">Sign out</button>`:""}<br><label class="small">Theme <select id="theme" class="themesel">${THEMES.map(([k,l])=>`<option value="${k}" ${getTheme()===k?"selected":""}>${l}</option>`).join("")}</select></label></div></div>
+    ${role==="parent" && currentStudent ? `<p class="banner">Read-only view of ${esc(studentName())}'s practice.${kids.length>1?` <select id="kidsel" aria-label="Student" class="themesel">${kids.map(k=>`<option value="${esc(k.email)}" ${k.email===currentStudent?"selected":""}>${esc(k.name)}</option>`).join("")}</select>`:""}</p>` : ""}
     ${notice?`<p class="banner" id="notice">${esc((()=>{ const n=notice; notice=""; return n; })())}</p>`:""}
     ${saveErr?`<p class="banner" id="saveerr">${esc(saveErr)}</p>`:""}`;
 }
-function bindHeader(){ const th=document.getElementById("theme"); if(th) th.onchange=()=>applyTheme(th.value); const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
+function bindHeader(){ const ks=document.getElementById("kidsel"); if(ks) ks.onchange=()=>switchKid(ks.value); const th=document.getElementById("theme"); if(th) th.onchange=()=>applyTheme(th.value); const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
 function renderNav(){
   const host=document.getElementById("navhost");
   if(view.tab==="test"){ host.innerHTML=""; return; }
-  const tabs = role==="parent" ? [["progress","Progress"],["awards","Awards"]] : [["home","Practice"],["progress","Progress"],["awards","My awards"]];
+  const tabs = role==="parent" ? [["progress","Progress"],["awards","Awards"],["family",isAdmin?"Families":"My children"]] : [["home","Practice"],["progress","Progress"],["awards","My awards"]];
   const cur = view.tab==="result" ? (view.from||"progress") : view.tab;
   host.innerHTML = `<nav class="tabs"><div class="in">${tabs.map(([k,l])=>`<button data-tab="${k}" ${cur===k?'aria-current="page"':""}>${l}</button>`).join("")}</div></nav>`;
   host.querySelectorAll("button").forEach(b=>b.onclick=()=>{ go(b.dataset.tab); });
 }
 function go(tab, extra){ view = Object.assign({tab}, extra||{}); render(); window.scrollTo(0,0); }
 function render(){
-  if(role==="parent" && view.tab==="home") view={tab:"progress"};
+  if(role==="parent" && (view.tab==="home" || (!currentStudent && view.tab!=="family"))) view={tab:currentStudent?"progress":"family"};
   setWide(view.tab==="test");
   if(view.tab==="test") renderTest();
   else if(view.tab==="result") renderResult();
   else if(view.tab==="progress") renderProgress();
   else if(view.tab==="awards") renderAwards();
+  else if(view.tab==="family") renderFamily();
   else renderHome();
   renderNav(); bindHeader();
 }
@@ -591,16 +629,85 @@ function renderAwards(){
   app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"awards"}));
 }
 
+/* ================= families ================= */
+async function switchKid(email){
+  if(role!=="parent" || !kids.some(k=>k.email===email)) return;
+  currentStudent=email; try{ localStorage.setItem("board-pyq-parent-student",email); }catch(e){}
+  store=await makeStore(email); await loadAll(); render();
+}
+async function reloadKids(){
+  kids = await roster.kidsOf(myEmail);
+  if(!kids.some(k=>k.email===currentStudent)){
+    let last=null; try{ last=localStorage.getItem("board-pyq-parent-student"); }catch(e){}
+    currentStudent = (kids.find(k=>k.email===last)||kids[0]||{}).email||null;
+    if(currentStudent){ store=await makeStore(currentStudent); await loadAll(); } else { attempts=[]; stats=blankStats(); }
+  }
+}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+async function renderFamily(){
+  const title=isAdmin?"Families":"My children", subt=isAdmin?"Parents and their students":"Students who can practise here";
+  app.innerHTML = headerHtml(title, subt) + `<p class="sub" id="loading">Loading…</p>`; bindHeader();
+  let groups;
+  try{
+    if(isAdmin){
+      const [ps, ss] = await Promise.all([roster.allParents(), roster.allStudents()]);
+      const map=new Map(); const add=(email,name)=>{ if(!map.has(email)) map.set(email,{email,name:name||email,kids:[]}); };
+      add(ADMIN,"You (admin)"); ps.forEach(x=>add(x.email,x.name));
+      ss.forEach(x=>{ add(x.parent,x.parent); map.get(x.parent).kids.push(x); });
+      groups=[...map.values()];
+    } else groups=[{email:myEmail,name:"You",kids}];
+  }catch(e){ console.error(e); document.getElementById("loading").textContent="Could not load. Check your internet connection."; return; }
+  const kidRow=k=>`<div class="spread" style="padding:.4rem 0;border-bottom:1px solid var(--line)"><span><b>${esc(k.name)}</b><br><span class="small">${esc(k.email)}</span></span><button class="btn ghost small" data-rmkid="${esc(k.email)}" data-name="${esc(k.name)}">Remove</button></div>`;
+  const addKid=g=>`<form class="stack" data-addkid="${esc(g.email)}" style="margin-top:.7rem"><div class="row"><input class="field" name="name" placeholder="Student's name" required style="flex:1;min-width:8rem"><input class="field" name="email" type="email" placeholder="Student's Google email" required style="flex:2;min-width:12rem"></div><button class="btn small" style="align-self:flex-start">Add student</button></form>`;
+  app.innerHTML = headerHtml(title, subt) + `<p id="fmsg" class="banner" hidden></p>` +
+    (isAdmin?`<div class="panel stack" style="margin-bottom:1rem"><h3>Add a parent</h3><form class="row" id="addparent"><input class="field" name="name" placeholder="Parent's name" required style="flex:1;min-width:8rem"><input class="field" name="email" type="email" placeholder="Parent's Google email" required style="flex:2;min-width:12rem"><button class="btn small">Add parent</button></form><p class="small" style="margin:0">Then add that parent's students below. Each person signs in with the Google account you enter.</p></div>`:"") +
+    groups.map(g=>`<div class="panel" style="margin-bottom:.8rem"><div class="spread"><div><h3>${esc(isAdmin?g.name:"Students")}</h3>${isAdmin?`<span class="small">${esc(g.email)}</span>`:""}</div>
+      ${isAdmin&&g.email!==ADMIN?`<button class="btn ghost small" data-rmparent="${esc(g.email)}" data-name="${esc(g.name)}" data-n="${g.kids.length}">Remove parent</button>`:""}</div>
+      ${g.kids.length?g.kids.map(kidRow).join(""):`<p class="small">No students yet.</p>`}${addKid(g)}</div>`).join("") +
+    `<p class="small">Removing a student stops them signing in. Their saved results are kept and come back if the same email is added again.</p>`;
+  bindHeader();
+  const msg=t=>{ const m=document.getElementById("fmsg"); m.textContent=t; m.hidden=!t; };
+  const refresh=async()=>{ await reloadKids(); render(); };
+  app.querySelectorAll("form[data-addkid]").forEach(f=>f.onsubmit=async e=>{ e.preventDefault();
+    const parent=f.dataset.addkid, name=f.name.value.trim(), email=f.email.value.trim().toLowerCase();
+    if(!EMAIL_RE.test(email)) return msg("Enter a valid Google email.");
+    if(email===ADMIN || groups.some(g=>g.email===email)) return msg("That email is a parent, so it cannot be a student.");
+    if(groups.some(g=>g.kids.some(k=>k.email===email))) return msg("That student is already added.");
+    try{ await roster.setStudent(email,{name,parent}); await refresh(); }catch(err){ console.error(err); msg("Could not add. That email may already belong to another family."); } });
+  const ap=document.getElementById("addparent");
+  if(ap) ap.onsubmit=async e=>{ e.preventDefault(); const name=ap.name.value.trim(), email=ap.email.value.trim().toLowerCase();
+    if(!EMAIL_RE.test(email)) return msg("Enter a valid Google email.");
+    if(groups.some(g=>g.email===email||g.kids.some(k=>k.email===email))) return msg("That email is already in the list.");
+    try{ await roster.setParent(email,{name}); await refresh(); }catch(err){ console.error(err); msg("Could not add the parent."); } };
+  app.querySelectorAll("[data-rmkid]").forEach(b=>b.onclick=()=>confirmBox("Remove student?",`${b.dataset.name} will no longer be able to sign in. Saved results are kept.`,"Remove","Cancel",async()=>{
+    try{ await roster.deleteStudent(b.dataset.rmkid); await refresh(); }catch(err){ console.error(err); msg("Could not remove."); } },true));
+  app.querySelectorAll("[data-rmparent]").forEach(b=>b.onclick=()=>{
+    if(+b.dataset.n) return msg("Remove this parent's students first.");
+    confirmBox("Remove parent?",`${b.dataset.name} will no longer be able to sign in.`,"Remove","Cancel",async()=>{
+      try{ await roster.deleteParent(b.dataset.rmparent); await refresh(); }catch(err){ console.error(err); msg("Could not remove."); } },true); });
+}
+
 /* ================= boot ================= */
 async function startAs(r){
-  role=r; await loadAll();
-  view={tab: r==="parent"?"progress":"home"}; render();
+  role=r; if(currentStudent) await loadAll();
+  view={tab: r==="parent" ? (currentStudent?"progress":"family") : "home"}; render();
+}
+async function startParent(email){
+  myEmail=email; isAdmin=email===ADMIN;
+  await roster.seed();
+  kids=await roster.kidsOf(email);
+  let last=null; try{ last=localStorage.getItem("board-pyq-parent-student"); }catch(e){}
+  currentStudent=(kids.find(k=>k.email===last)||kids[0]||{}).email||null;
+  store=currentStudent?await makeStore(currentStudent):null;
+  return startAs("parent");
 }
 async function boot(){
   if(DEMO){
     const asParent = DEMO_FORCED && qs.get("demo")==="parent";
-    currentStudent=STUDENTS[0].email; store=localStore(currentStudent); me=null;
-    return startAs(asParent?"parent":"student");
+    roster=localRoster(); makeStore=async e=>localStore(e); me=null;
+    if(asParent) return startParent(ADMIN);
+    myEmail=STUDENTS[0].email; currentStudent=myEmail; kids=[{email:myEmail,name:STUDENTS[0].name}]; store=await makeStore(myEmail);
+    return startAs("student");
   }
   try{
     const fa=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`);
@@ -612,13 +719,18 @@ async function boot(){
         try{ await au.signInWithPopup(auth,p); }catch(e){ if(e && (e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment")) await au.signInWithRedirect(auth,p); else showLogin("Sign-in did not complete. Please try again."); } },
       signOut: async()=>{ await au.signOut(auth); }
     };
+    roster=firebaseRoster(fs,db); makeStore=async e=>firebaseStore(fs,db,e);
     au.onAuthStateChanged(auth, async user=>{
-      role=null; currentStudent=null; clearInterval(tick); test=null; document.getElementById("overlay").innerHTML="";
+      role=null; currentStudent=null; kids=[]; isAdmin=false; myEmail=""; clearInterval(tick); test=null; document.getElementById("overlay").innerHTML="";
       if(!user){ me=null; const m=loginMsg; loginMsg=""; return showLogin(m); }
       me=user; const email=(user.email||"").toLowerCase();
-      if(STUDENTS.some(x=>x.email===email)){ currentStudent=email; store=await firebaseStore(fs,db,email); return startAs("student"); }
-      if(PARENTS.includes(email)){ currentStudent=STUDENTS[0].email; store=await firebaseStore(fs,db,currentStudent); return startAs("parent"); }
-      loginMsg=`${email} is not set up for this app. Sign in with the student or parent Google account.`;
+      try{
+        if(email===ADMIN) return await startParent(email);
+        const st=await roster.getStudent(email);
+        if(st){ myEmail=email; currentStudent=email; kids=[{email,name:st.name}]; store=await makeStore(email); return startAs("student"); }
+        if(await roster.getParent(email)) return await startParent(email);
+      }catch(e){ console.error(e); loginMsg="Could not check your account. Check your internet connection and try again."; await au.signOut(auth); return; }
+      loginMsg=`${email} is not set up for this app. Ask the admin to add this Google account.`;
       await au.signOut(auth);
     });
   }catch(e){ console.error(e); app.innerHTML=`<p class="banner">Could not load. Check your internet connection and the Firebase settings in config.js.</p>`; }

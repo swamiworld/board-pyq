@@ -17,6 +17,11 @@ Open `http://localhost:8000/index.html?demo=1` (student) or `?demo=parent` (pare
    ```
 2. In Firebase console → Authentication → Settings → Authorised domains, add `<your-github-username>.github.io` if it is not there already.
 
+## Families
+The admin (`adminEmail` in `config.js`) adds parents and their students on the **Families** tab. Each parent then manages their own students on **My children**. The list is stored in Firestore (`pyqParents`, `pyqStudents`), not in `config.js`. The `students` and `parentEmails` in `config.js` only seed the list the first time the admin signs in.
+
+Order for the first rollout: publish the rules, push the app, then the admin signs in once (this adds the seed student). Until then the existing student cannot sign in.
+
 ## GitHub Pages
 Create a repository `board-pyq`, push this folder to `main`, then Settings → Pages → Deploy from branch `main`, folder `/ (root)`.
 

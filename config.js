@@ -11,7 +11,11 @@ window.APP_CONFIG = {
     appId: "1:149289090409:web:d937e31140d3582aa8d1f8"
   },
 
-  // Google accounts, in lowercase
+  // The admin adds parents and students inside the app (stored in Firestore).
+  adminEmail: "swamiworld@gmail.com",
+
+  // First-run seed only: when the admin first signs in, these students are added under the first parent.
+  // Demo mode also starts from them. After that, manage people in the app, not here. Lowercase emails.
   students: [
     { email: "dharshiniworld@gmail.com", name: "Dharshini" }
   ],

@@ -73,6 +73,7 @@ button{cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:1rem}
 .who{text-align:right;font-size:.85rem;color:var(--muted)}
+.themesel{border:1.5px solid var(--line);border-radius:8px;background:var(--surface);padding:.15rem .3rem;font-size:.85rem;min-height:1.9rem}
 /* home */
 .setrow{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.35rem 0;flex-wrap:wrap}
 .stepper{display:inline-flex;align-items:center;gap:.4rem}
@@ -198,6 +199,14 @@ const isLocal = ["localhost","127.0.0.1","[::1]"].includes(location.hostname);
 const DEMO_FORCED = isLocal && qs.has("demo");
 const DEMO = DEMO_FORCED || String(CFG.firebase.apiKey||"").startsWith("PASTE");
 const app = document.getElementById("app");
+// Theme: system (default), light or dark. Remembered on this device for both roles.
+const THEMES=[["system","System"],["light","Light"],["dark","Dark"]];
+const getTheme=()=>{ try{ const t=localStorage.getItem("board-pyq-theme"); return THEMES.some(x=>x[0]===t)?t:"system"; }catch(e){ return "system"; } };
+function applyTheme(t){
+  const r=document.documentElement; if(t==="system") r.removeAttribute("data-theme"); else r.setAttribute("data-theme",t);
+  try{ localStorage.setItem("board-pyq-theme",t); }catch(e){}
+}
+applyTheme(getTheme());
 
 /* ================= helpers ================= */
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -212,6 +221,8 @@ function mathHtml(s){
 const BYID = new Map(BANK.questions.map(q=>[q.id,q]));
 const CHAPTER = n => BANK.chapters.find(c=>c.n===n);
 const qsOfChapter = n => BANK.questions.filter(q=>q.chapter===n);
+const fmtTime = ms => new Date(ms).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+const fmtWhen = a => `${fmtDate(a.startedAt)}, ${fmtTime(a.startedAt)}${a.finishedAt?` – ${fmtTime(a.finishedAt)}`:""}`;
 const fmtDate = ms => new Date(ms).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
 const mmss = sec => { sec=Math.max(0,Math.round(sec)); return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0"); };
 const dur = sec => { sec=Math.round(sec); return sec>=60 ? Math.floor(sec/60)+" min "+(sec%60)+" s" : sec+" s"; };
@@ -241,6 +252,7 @@ function localStore(email){
     async getStats(){ return get("stats"); },
     async saveStats(s){ set("stats", s); },
     async addAttempt(a){ const list=get("attempts")||[]; const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); list.push({...a,id}); set("attempts",list); return id; },
+    async deleteAttempts(ids){ set("attempts",(get("attempts")||[]).filter(a=>!ids.includes(a.id))); },
     async listAttempts(){ return (get("attempts")||[]).slice().sort((x,y)=>y.startedAt-x.startedAt); }
   };
 }
@@ -252,6 +264,7 @@ async function firebaseStore(fs, db, email){
     async getStats(){ const s=await fs.getDoc(fs.doc(db, base+"/state/stats")); return s.exists()? s.data() : null; },
     async saveStats(x){ await fs.setDoc(fs.doc(db, base+"/state/stats"), x); },
     async addAttempt(a){ const r=await fs.addDoc(fs.collection(db, base+"/attempts"), a); return r.id; },
+    async deleteAttempts(ids){ await Promise.all(ids.map(id=>fs.deleteDoc(fs.doc(db, base+"/attempts/"+id)))); },
     async listAttempts(){
       const q = fs.query(fs.collection(db, base+"/attempts"), fs.orderBy("startedAt","desc"), fs.limit(500));
       return (await fs.getDocs(q)).docs.map(d=>({...d.data(), id:d.id}));
@@ -263,7 +276,7 @@ async function firebaseStore(fs, db, email){
 let store=null, role=null, authApi=null, me=null, loginMsg="", currentStudent=null;
 let settings=null, stats=null, attempts=[];
 let view={tab:"home"};         // tab: home | progress | awards | test | result
-let test=null, tick=null, saveErr="";
+let test=null, tick=null, saveErr="", notice="";
 const blankStats = () => ({seen:{}, wrong:{}, correctStreak:{}, updatedAt:0});
 const studentName = () => (STUDENTS.find(x=>x.email===currentStudent)||STUDENTS[0]).name;
 
@@ -300,11 +313,12 @@ function pickQuestions(chapter, count, opts={}){
 function setWide(w){ app.classList.toggle("wide", !!w); }
 function headerHtml(title, subtitle){
   return `<div class="head"><div><h1>${esc(title)}</h1>${subtitle?`<p class="sub">${esc(subtitle)}</p>`:""}</div>
-    <div class="who">${esc(role==="parent" ? "Parent view" : studentName())}${(!DEMO && me)?`<br><button class="linkbtn" id="signout">Sign out</button>`:""}</div></div>
+    <div class="who">${esc(role==="parent" ? "Parent view" : studentName())}${(!DEMO && me)?`<br><button class="linkbtn" id="signout">Sign out</button>`:""}<br><label class="small">Theme <select id="theme" class="themesel">${THEMES.map(([k,l])=>`<option value="${k}" ${getTheme()===k?"selected":""}>${l}</option>`).join("")}</select></label></div></div>
     ${role==="parent" ? `<p class="banner">Read-only view of ${esc(studentName())}'s practice.</p>` : ""}
+    ${notice?`<p class="banner" id="notice">${esc((()=>{ const n=notice; notice=""; return n; })())}</p>`:""}
     ${saveErr?`<p class="banner" id="saveerr">${esc(saveErr)}</p>`:""}`;
 }
-function bindHeader(){ const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
+function bindHeader(){ const th=document.getElementById("theme"); if(th) th.onchange=()=>applyTheme(th.value); const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
 function renderNav(){
   const host=document.getElementById("navhost");
   if(view.tab==="test"){ host.innerHTML=""; return; }
@@ -431,10 +445,11 @@ function renderTest(){
   on("exit",()=>confirmBox("Leave this test?","It will not be saved and your progress will not change.","Leave test","Keep going",()=>{ clearInterval(tick); test=null; go("home"); }, true));
   on("done",()=>{
     bankTime();
-    const un=test.qs.filter(x=>test.answers[x.id]==null).length, rv=test.review.size;
+    const un=test.qs.filter(x=>test.answers[x.id]==null).length, rv=test.review.size, got=test.qs.length-un;
+    if(!got) return confirmBox("Nothing answered","You have not answered any question, so nothing will be saved.","End test","Go back",()=>finishTest(false));
+    const parts=[]; if(un) parts.push(`${un} unanswered question${un===1?" is":"s are"} left out, so the result counts only the ${got} you answered`); if(rv) parts.push(`${rv} marked for review`);
     if(!un && !rv) return finishTest(false);
-    const parts=[]; if(un) parts.push(`${un} unanswered`); if(rv) parts.push(`${rv} marked for review`);
-    confirmBox("Submit the test?", `You still have ${parts.join(" and ")}.`, "Submit", "Go back", ()=>finishTest(false));
+    confirmBox("Submit the test?", parts.join(". ")+".", "Submit", "Go back", ()=>finishTest(false));
   });
 }
 const timeLeft = () => Math.max(0, test.limit - (Date.now()-test.startedAt)/1000);
@@ -458,10 +473,16 @@ async function finishTest(timedOut){
   test.submitted=true; clearInterval(tick);
   document.getElementById("overlay").innerHTML="";
   const t=test, finishedAt=Date.now();
-  const items = t.qs.map(q=>{ const ch=t.answers[q.id]; return {id:q.id, chosen:ch==null?null:ch, correct:ch===q.answer, timeSec:Math.round((t.time[q.id]||0)*10)/10, hintUsed:t.hint.has(q.id), review:t.review.has(q.id)}; });
+  // Only answered questions count: unanswered ones are left out, not revealed, and stay unseen.
+  const asked=t.qs.length;
+  if(!t.qs.some(q=>t.answers[q.id]!=null)){
+    test=null; notice = timedOut ? "Time's up. No question was answered, so nothing was saved." : "Nothing was answered, so nothing was saved.";
+    return go("home");
+  }
+  const items = t.qs.filter(q=>t.answers[q.id]!=null).map(q=>{ const ch=t.answers[q.id]; return {id:q.id, chosen:ch==null?null:ch, correct:ch===q.answer, timeSec:Math.round((t.time[q.id]||0)*10)/10, hintUsed:t.hint.has(q.id), review:t.review.has(q.id)}; });
   const score = items.filter(i=>i.correct).length, total=items.length;
   const award = awardFor(pct(score,total));
-  const attempt = {chapter:t.chapter, startedAt:t.startedAt, finishedAt, count:total, timerOn:t.timerOn, timeLimitSec:t.limit, timedOut:!!timedOut, score, total, award:award.key, items};
+  const attempt = {chapter:t.chapter, startedAt:t.startedAt, finishedAt, count:asked, timerOn:t.timerOn, timeLimitSec:t.limit, timedOut:!!timedOut, score, total, award:award.key, items};
   // stats
   const day=todayStr();
   for(const it of items){
@@ -492,11 +513,11 @@ function renderResult(){
   const a=view.attempt, ch=CHAPTER(a.chapter), award=awardByKey(a.award);
   const spent=a.items.reduce((s,i)=>s+(i.timeSec||0),0), avg=spent/Math.max(1,a.items.length);
   const wrongN=a.items.filter(i=>i.chosen!=null&&!i.correct).length, skipN=a.items.filter(i=>i.chosen==null).length;
-  app.innerHTML = headerHtml("Result", `${ch.t} · ${fmtDate(a.startedAt)}`) +
+  app.innerHTML = headerHtml("Result", `${ch.t} · ${fmtWhen(a)}`) +
   (view.timedOut||a.timedOut?`<p class="banner"><b>Time's up.</b> The test was submitted automatically.</p>`:"") +
   `<div class="panel"><div class="spread"><div class="score">${a.score}<small> / ${a.total}</small></div>
       <div class="award"><span class="em" aria-hidden="true">${award.icon}</span><div><b>${esc(award.name)}</b><br><span class="small">${pct(a.score,a.total)}%</span></div></div></div>
-    <div class="stats"><div><b>${dur(spent)}</b><span class="small">Total time</span></div><div><b>${dur(avg)}</b><span class="small">Per question</span></div><div><b>${wrongN} wrong · ${skipN} skipped</b><span class="small">Mistakes</span></div></div></div>
+    <div class="stats"><div><b>${dur(spent)}</b><span class="small">Total time</span></div><div><b>${dur(avg)}</b><span class="small">Per question</span></div><div><b>${wrongN} wrong${skipN?` · ${skipN} skipped`:""}</b><span class="small">Mistakes</span></div></div></div>
   <h2>Every question</h2>
   ${a.items.map((it,i)=>{ const q=BYID.get(it.id); if(!q) return "";
     const slow = it.timeSec>=30 && it.timeSec>2*avg;
@@ -536,30 +557,36 @@ function renderProgress(){
     const t=items.reduce((x,i)=>x+(i.timeSec||0),0);
     return {c, s, acc: items.length?pct(right,items.length):null, avg: items.length? t/items.length : null}; });
   const done = rows.filter(r=>r.s.tests);
-  // wrong most often, from every attempt
-  const wm = new Map();
-  for(const a of attempts) for(const it of a.items) if(!it.correct){ const e=wm.get(it.id)||{n:0,ans:[]}; e.n++; e.ans.push(it.chosen); wm.set(it.id,e); }
-  const worst=[...wm.entries()].sort((a,b)=>b[1].n-a[1].n).slice(0,15);
   app.innerHTML = headerHtml("Progress", `${attempts.length} test${attempts.length===1?"":"s"} so far`) +
-  (done.length ? `<div class="panel tblwrap"><table class="tbl"><thead><tr><th>Chapter</th><th>Tests</th><th>Best</th><th>Last</th><th>Accuracy</th><th>Avg time</th><th>Seen</th></tr></thead><tbody>
-    ${done.map(r=>`<tr><td>${r.c.n}. ${esc(r.c.t)}</td><td>${r.s.tests}</td><td>${r.s.best}%</td><td>${r.s.last.score}/${r.s.last.total}</td><td>${r.acc}%</td><td>${dur(r.avg)}</td><td>${r.s.seen}/${r.s.total}</td></tr>`).join("")}</tbody></table></div>`
+  (done.length ? `<div class="panel tblwrap"><table class="tbl"><thead><tr><th>Chapter</th><th>Tests</th><th>Best</th><th>Last</th><th>Last taken</th><th>Accuracy</th><th>Avg time</th><th>Seen</th>${role==="parent"?"<th></th>":""}</tr></thead><tbody>
+    ${done.map(r=>`<tr><td>${r.c.n}. ${esc(r.c.t)}</td><td>${r.s.tests}</td><td>${r.s.best}%</td><td>${r.s.last.score}/${r.s.last.total}</td><td>${fmtDate(r.s.last.finishedAt||r.s.last.startedAt)}</td><td>${r.acc}%</td><td>${dur(r.avg)}</td><td>${r.s.seen}/${r.s.total}</td>${role==="parent"?`<td><button class="btn ghost small" data-clear="${r.c.n}" aria-label="Clear results for ${esc(r.c.t)}">Clear</button></td>`:""}</tr>`).join("")}</tbody></table></div>`
     : `<p class="panel">No tests yet.</p>`) +
-  (role==="parent" ? `<h2>Missed most often</h2>` + (worst.length ? worst.map(([id,e])=>{ const q=BYID.get(id); if(!q) return "";
-      const given=e.ans.map(x=>x==null?"–":x).join(", ");
-      return `<div class="panel rq" style="margin-bottom:.6rem"><div class="spread"><b>${esc(id)} · ${esc(CHAPTER(q.chapter).t)}</b><span class="pill bad">Missed ${e.n}×</span></div>
-        <div class="qbox">${mathHtml(q.text)}</div>${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure">`:""}
-        <p style="margin:.2rem 0"><b>Her answers:</b> ${esc(given)} · <b>Correct:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>
-        <div class="src">${esc(sourceLine(q))}</div></div>`; }).join("") : `<p class="panel">Nothing missed yet.</p>`) : "") +
   `<h2>Past tests</h2>` + (attempts.length ? attempts.map((a,i)=>{ const aw=awardByKey(a.award);
-    return `<button class="att" data-a="${i}"><span><b>${a.score}/${a.total}</b> · ${esc(CHAPTER(a.chapter).t)}<br><span class="small">${fmtDate(a.startedAt)}${a.timerOn?" · timed":""}${a.timedOut?" · time's up":""}</span></span><span style="font-size:1.8rem" aria-hidden="true">${aw.icon}</span></button>`; }).join("") : `<p class="small">Nothing here yet.</p>`);
+    return `<button class="att" data-a="${i}"><span><b>${a.score}/${a.total}</b> · ${esc(CHAPTER(a.chapter).t)}<br><span class="small">${fmtWhen(a)}${a.timerOn?" · timed":""}${a.timedOut?" · time's up":""}</span></span><span style="font-size:1.8rem" aria-hidden="true">${aw.icon}</span></button>`; }).join("") : `<p class="small">Nothing here yet.</p>`);
   app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"progress"}));
+  app.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{ const n=+b.dataset.clear;
+    confirmBox("Clear this chapter?", `All tests, awards and seen/missed history for "${CHAPTER(n).t}" will be deleted so ${studentName()} can start over. This cannot be undone.`, "Clear results", "Cancel", ()=>clearChapter(n), true); });
+}
+async function clearChapter(n){
+  if(role!=="parent") return;
+  const ids=new Set(qsOfChapter(n).map(q=>q.id)), gone=attempts.filter(a=>a.chapter===n);
+  try{
+    const st = Object.assign(blankStats(), (await store.getStats())||{});
+    for(const k of ["seen","wrong","correctStreak"]) for(const id of Object.keys(st[k]||{})) if(ids.has(id)) delete st[k][id];
+    st.updatedAt=Date.now();
+    await store.deleteAttempts(gone.map(a=>a.id));
+    await store.saveStats(st);
+    stats=st; attempts=attempts.filter(a=>a.chapter!==n); saveErr="";
+    notice=`Cleared "${CHAPTER(n).t}".`;
+  }catch(e){ console.error(e); saveErr="Could not clear. Check your internet connection and try again."; }
+  render();
 }
 function renderAwards(){
   const counts={}; attempts.forEach(a=>{ counts[a.award]=(counts[a.award]||0)+1; });
   app.innerHTML = headerHtml("My awards", `${attempts.length} earned`) +
   (attempts.length ? `<div class="row" style="margin-bottom:1rem">${CFG.awards.filter(a=>counts[a.key]).map(a=>`<span class="pill due">${a.icon} ${counts[a.key]}</span>`).join("")}</div>
     <div class="badges">${attempts.map((a,i)=>{ const aw=awardByKey(a.award);
-      return `<button class="badge" data-a="${i}" style="font:inherit;color:inherit;cursor:pointer"><span aria-hidden="true">${aw.icon}</span><b>${esc(aw.name)}</b><small>${a.score}/${a.total} · Ch ${a.chapter}</small><small>${fmtDate(a.startedAt)}</small></button>`; }).join("")}</div>`
+      return `<button class="badge" data-a="${i}" style="font:inherit;color:inherit;cursor:pointer"><span aria-hidden="true">${aw.icon}</span><b>${esc(aw.name)}</b><small>${a.score}/${a.total} · Ch ${a.chapter}</small><small>${fmtDate(a.startedAt)}</small><small>${fmtTime(a.startedAt)} – ${a.finishedAt?fmtTime(a.finishedAt):""}</small></button>`; }).join("")}</div>`
     : `<p class="panel">Finish a test to earn your first award.</p>`);
   app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"awards"}));
 }

@@ -179,8 +179,22 @@ nav.tabs button{background:none;border:0;padding:.7rem .2rem .8rem;font-weight:7
 nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
 .login{min-height:80vh;display:flex;flex-direction:column;justify-content:center;gap:1rem}
 .katex-display{margin:.4rem 0}
+/* subjects, practice modes, bookmarks */
+.subjbar{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 0 1rem}
+.subjbar button{border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-weight:700;border-radius:999px;padding:.35rem .9rem;min-height:2.4rem}
+.subjbar button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.mode{text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:.7rem .8rem;min-height:3.6rem;display:flex;flex-direction:column;gap:.1rem}
+.mode b{font-size:1rem}
+.mode .small{font-size:.82rem}
+.mode[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));box-shadow:inset 0 0 0 1px var(--accent)}
+.bm{display:inline-flex;align-items:center;gap:.35rem}
+.bm svg{flex:none}
+.bm[aria-pressed="true"]{background:color-mix(in srgb,var(--pink) 18%,var(--surface));border-color:var(--pink);color:var(--ink)}
+.bm[aria-pressed="true"] svg{color:var(--pink)}
+.bmtag{color:var(--pink);display:inline-flex;align-items:center;gap:.25rem;font-size:.8rem;font-weight:700}
 </style>
-<script src="config.js"></script>
+<script src="config.js?v=2026-11-01"></script>
 <script src="questions.js"></script>
 </head>
 <body>
@@ -189,9 +203,17 @@ nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 
 <div id="overlay"></div>
 <script type="module">
 "use strict";
-const CFG = window.APP_CONFIG, BANK = window.PYQ;
+const CFG = window.APP_CONFIG;
+// One question bank per subject; only subjects whose bank file is loaded appear.
+const SUBJECTS = (CFG.subjects||[{key:"maths",name:"Maths",bank:"PYQ"}]).filter(s=>window[s.bank] && window[s.bank].questions);
+const BANKS = Object.fromEntries(SUBJECTS.map(s=>[s.key, window[s.bank]]));
+let subject = SUBJECTS[0].key, BANK = BANKS[subject];
+try{ const k=localStorage.getItem("board-pyq-subject"); if(BANKS[k]){ subject=k; BANK=BANKS[k]; } }catch(e){}
+function setSubject(k){ if(!BANKS[k]) return; subject=k; BANK=BANKS[k]; try{ localStorage.setItem("board-pyq-subject",k); }catch(e){} }
+const subjectName = k => (SUBJECTS.find(s=>s.key===k)||{name:k}).name;
+const attemptSubject = a => a.subject || SUBJECTS[0].key;   // attempts saved before subjects existed are Maths
 const STUDENTS = CFG.students.map(s=>({...s, email:s.email.toLowerCase()}));
-const ADMIN = CFG.adminEmail.toLowerCase();
+const ADMIN = String(CFG.adminEmail||(CFG.parentEmails||[])[0]||"").toLowerCase();
 const SEED_PARENT = (CFG.parentEmails[0]||CFG.adminEmail).toLowerCase();   // first-run roster seed only
 const FB_VER = "10.12.2";
 const APP_VERSION = "2026-10-31";
@@ -219,9 +241,26 @@ function mathHtml(s){
     return window.katex.renderToString(part,{throwOnError:false});
   }).join("");
 }
-const BYID = new Map(BANK.questions.map(q=>[q.id,q]));
-const CHAPTER = n => BANK.chapters.find(c=>c.n===n);
+const BYID = new Map(Object.values(BANKS).flatMap(b=>b.questions.map(q=>[q.id,q])));
+const CHAPTER = (n, subj=subject) => BANKS[subj].chapters.find(c=>c.n===n);
 const qsOfChapter = n => BANK.questions.filter(q=>q.chapter===n);
+// What a test was drawn from: one chapter, her mistakes, her bookmarks, or both.
+const MODES = {
+  chapter:  {name:"Chapters", desc:"Pick one chapter"},
+  wrong:    {name:"Mistakes", desc:"Questions you got wrong"},
+  bookmark: {name:"Bookmarked", desc:"Questions you saved"},
+  both:     {name:"Bookmarked + mistakes", desc:"Saved and missed questions"},
+  paper:    {name:"Past papers", desc:"A whole board paper"}
+};
+const paperName = p => `${p.year} ${EXAM[p.exam]||p.exam} · ${p.code}`;
+const attemptMode = a => a.mode || "chapter";
+function attemptLabel(a){
+  const m=attemptMode(a), s=attemptSubject(a);
+  const base = m==="chapter" ? (CHAPTER(a.chapter,s)||{t:"Chapter "+a.chapter}).t : m==="paper" ? paperName(a.paper) : MODES[m].name;
+  return SUBJECTS.length>1 ? `${subjectName(s)} · ${base}` : base;
+}
+const attemptShort = a => attemptMode(a)==="chapter" ? "Ch "+a.chapter : attemptMode(a)==="paper" ? `${a.paper.year} ${a.paper.code}` : MODES[attemptMode(a)].name;
+const BM_ICON = on => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" fill="${on?"currentColor":"none"}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
 const fmtTime = ms => new Date(ms).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
 const fmtWhen = a => `${fmtDate(a.startedAt)}, ${fmtTime(a.startedAt)}${a.finishedAt?` – ${fmtTime(a.finishedAt)}`:""}`;
 const fmtDate = ms => new Date(ms).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
@@ -242,7 +281,7 @@ function sourceLine(q){
 }
 
 /* ================= storage ================= */
-// Firestore layout: pyq/{email}/state/settings, pyq/{email}/state/stats, pyq/{email}/attempts/{autoId}
+// Firestore layout: pyq/{email}/state/settings, .../state/stats, .../state/bookmarks {ids:{qid:ms}, updatedAt}, pyq/{email}/attempts/{autoId}
 function localStore(email){
   const K = "board-pyq-v1:" + (email && email!==STUDENTS[0].email ? email+":" : "");
   const get = k => { try{ const v=localStorage.getItem(K+k); return v?JSON.parse(v):null; }catch(e){ return null; } };
@@ -252,6 +291,8 @@ function localStore(email){
     async saveSettings(s){ set("settings", s); },
     async getStats(){ return get("stats"); },
     async saveStats(s){ set("stats", s); },
+    async getBookmarks(){ return get("bookmarks"); },
+    async saveBookmarks(b){ set("bookmarks", b); },
     async addAttempt(a){ const list=get("attempts")||[]; const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); list.push({...a,id}); set("attempts",list); return id; },
     async deleteAttempts(ids){ set("attempts",(get("attempts")||[]).filter(a=>!ids.includes(a.id))); },
     async listAttempts(){ return (get("attempts")||[]).slice().sort((x,y)=>y.startedAt-x.startedAt); }
@@ -264,6 +305,8 @@ async function firebaseStore(fs, db, email){
     async saveSettings(x){ await fs.setDoc(fs.doc(db, base+"/state/settings"), x); },
     async getStats(){ const s=await fs.getDoc(fs.doc(db, base+"/state/stats")); return s.exists()? s.data() : null; },
     async saveStats(x){ await fs.setDoc(fs.doc(db, base+"/state/stats"), x); },
+    async getBookmarks(){ const s=await fs.getDoc(fs.doc(db, base+"/state/bookmarks")); return s.exists()? s.data() : null; },
+    async saveBookmarks(x){ await fs.setDoc(fs.doc(db, base+"/state/bookmarks"), x); },
     async addAttempt(a){ const r=await fs.addDoc(fs.collection(db, base+"/attempts"), a); return r.id; },
     async deleteAttempts(ids){ await Promise.all(ids.map(id=>fs.deleteDoc(fs.doc(db, base+"/attempts/"+id)))); },
     async listAttempts(){
@@ -311,7 +354,9 @@ function firebaseRoster(fs, db){
 /* ================= state ================= */
 let store=null, role=null, authApi=null, me=null, loginMsg="", currentStudent=null;
 let roster=null, makeStore=null, kids=[], isAdmin=false, myEmail="";   // kids: the students on screen (one for a student, her children for a parent)
-let settings=null, stats=null, attempts=[];
+let settings=null, stats=null, attempts=[], bookmarks={ids:{},updatedAt:0};
+let homePaper=null;            // year+exam chosen on the Past papers picker: {year, exam}
+let homeMode="chapter";        // what the Practice tab is set to: chapter | wrong | bookmark | both
 let view={tab:"home"};         // tab: home | progress | awards | test | result
 let test=null, tick=null, saveErr="", notice="";
 const blankStats = () => ({seen:{}, wrong:{}, correctStreak:{}, updatedAt:0});
@@ -319,13 +364,14 @@ const studentName = () => (kids.find(x=>x.email===currentStudent)||{name:"Studen
 
 async function loadAll(){
   try{
-    const [s,st,at] = await Promise.all([store.getSettings(), store.getStats(), store.listAttempts()]);
+    const [s,st,at,bm] = await Promise.all([store.getSettings(), store.getStats(), store.listAttempts(), store.getBookmarks()]);
     settings = Object.assign({}, CFG.defaults, s||{});
     stats = Object.assign(blankStats(), st||{});
     attempts = at||[];
+    bookmarks = Object.assign({ids:{},updatedAt:0}, bm||{});
   }catch(e){
     console.error(e); saveErr="Could not load saved data. Check your internet connection.";
-    settings = Object.assign({}, CFG.defaults); stats = blankStats(); attempts = [];
+    settings = Object.assign({}, CFG.defaults); stats = blankStats(); attempts = []; bookmarks = {ids:{},updatedAt:0};
   }
   settings.count = Math.min(CFG.maxCount, Math.max(CFG.minCount, +settings.count||CFG.defaults.count));
   settings.timerOn = !!settings.timerOn;
@@ -338,12 +384,35 @@ function persistSettings(){
 }
 
 /* ================= picking questions ================= */
-// Lowest `seen` first, ties random, so nothing repeats until the chapter is exhausted.
-// opts.mixWrong is reserved for a later "mix in questions I got wrong" option.
-function pickQuestions(chapter, count, opts={}){
-  const pool = qsOfChapter(chapter).map(q=>({q, r:Math.random(), s:(stats.seen[q.id]||0)}));
+// The questions a test can draw from, within the current subject.
+function poolFor(mode, chapter){
+  const wr=stats.wrong, bm=bookmarks.ids;
+  return BANK.questions.filter(q => mode==="chapter" ? q.chapter===chapter
+    : mode==="wrong" ? !!wr[q.id] : mode==="bookmark" ? !!bm[q.id] : (!!wr[q.id] || !!bm[q.id]));
+}
+// Lowest `seen` first, ties random, so nothing repeats until the pool is exhausted.
+function pickQuestions(mode, chapter, count){
+  const pool = poolFor(mode, chapter).map(q=>({q, r:Math.random(), s:(stats.seen[q.id]||0)}));
   pool.sort((a,b)=>a.s-b.s || a.r-b.r);
   return pool.slice(0, Math.min(count, pool.length)).map(x=>x.q);
+}
+// Board papers in the current subject: [{year, exam, code, items:[{q, n}] in paper order, expected}]
+const paperCache = {};
+function papersOf(){
+  if(paperCache[subject]) return paperCache[subject];
+  const m=new Map();
+  BANK.questions.forEach(q=>(q.sources||[]).forEach(([year,exam,code,n])=>{
+    const k=year+"|"+exam+"|"+code; if(!m.has(k)) m.set(k,{year,exam,code,items:[]}); m.get(k).items.push({q,n}); }));
+  const full=(SUBJECTS.find(s=>s.key===subject)||{}).paperSize||0;
+  const list=[...m.values()].map(p=>{ p.items.sort((a,b)=>a.n-b.n); p.expected=Math.max(full,p.items.length,p.items[p.items.length-1].n); return p; });
+  return paperCache[subject]=list.sort((a,b)=>b.year-a.year || (a.exam===b.exam?0:a.exam<b.exam?1:-1) || a.code.localeCompare(b.code,undefined,{numeric:true}));
+}
+const findPaper = p => papersOf().find(x=>x.year===p.year && x.exam===p.exam && x.code===p.code);
+async function toggleBookmark(id){
+  if(role!=="student") return;
+  if(bookmarks.ids[id]) delete bookmarks.ids[id]; else bookmarks.ids[id]=Date.now();
+  bookmarks.updatedAt=Date.now();
+  try{ await store.saveBookmarks(JSON.parse(JSON.stringify(bookmarks))); saveErr=""; }catch(e){ console.error(e); saveErr="Could not save the bookmark. Check your internet connection."; }
 }
 
 /* ================= shell ================= */
@@ -355,7 +424,11 @@ function headerHtml(title, subtitle){
     ${notice?`<p class="banner" id="notice">${esc((()=>{ const n=notice; notice=""; return n; })())}</p>`:""}
     ${saveErr?`<p class="banner" id="saveerr">${esc(saveErr)}</p>`:""}`;
 }
-function bindHeader(){ const ks=document.getElementById("kidsel"); if(ks) ks.onchange=()=>switchKid(ks.value); const th=document.getElementById("theme"); if(th) th.onchange=()=>applyTheme(th.value); const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
+function subjectBar(){
+  return `<div class="subjbar" role="group" aria-label="Subject">${SUBJECTS.map(s=>`<button data-subj="${esc(s.key)}" aria-pressed="${s.key===subject}">${esc(s.name)}</button>`).join("")}</div>`;
+}
+function bindSubjects(){ app.querySelectorAll("[data-subj]").forEach(b=>b.onclick=()=>{ setSubject(b.dataset.subj); render(); }); }
+function bindHeader(){ bindSubjects(); const ks=document.getElementById("kidsel"); if(ks) ks.onchange=()=>switchKid(ks.value); const th=document.getElementById("theme"); if(th) th.onchange=()=>applyTheme(th.value); const s=document.getElementById("signout"); if(s) s.onclick=()=>authApi.signOut(); }
 function renderNav(){
   const host=document.getElementById("navhost");
   if(view.tab==="test"){ host.innerHTML=""; return; }
@@ -386,39 +459,70 @@ function showLogin(msg){
 /* ================= home ================= */
 function chapterStats(n){
   const all = qsOfChapter(n), seen = all.filter(q=>stats.seen[q.id]>0).length;
-  const list = attempts.filter(a=>a.chapter===n);
+  const list = attempts.filter(a=>attemptSubject(a)===subject && attemptMode(a)==="chapter" && a.chapter===n);
   return {total:all.length, seen, tests:list.length, last:list[0]||null, best:list.reduce((m,a)=>Math.max(m,pct(a.score,a.total)),0), list};
 }
 function renderHome(){
   const units = []; BANK.chapters.forEach(c=>{ let u=units.find(x=>x.unit===c.unit); if(!u){ u={unit:c.unit,name:c.unitName,marks:c.unitMarks,items:[]}; units.push(u); } u.items.push(c); });
-  app.innerHTML = headerHtml("Board PYQ","Class 12 Maths · real board questions") + `
-  <div class="panel stack">
-    <div class="setrow"><span><b>Questions per test</b><br><span class="small">${CFG.minCount} to ${CFG.maxCount}</span></span>
-      <span class="stepper"><button id="dec" aria-label="Fewer questions">−</button><b id="cnt">${settings.count}</b><button id="inc" aria-label="More questions">+</button></span></div>
-    <div class="setrow"><span><b>Timer</b><br><span class="small">${CFG.secondsPerQuestion} s per question, whole test</span></span>
-      <span class="seg" role="group" aria-label="Timer"><button data-t="0" aria-pressed="${!settings.timerOn}">Off</button><button data-t="1" aria-pressed="${settings.timerOn}">On</button></span></div>
-  </div>` + units.map(u=>`
+  const poolN = m => poolFor(m).length;
+  const modeBtns = ["chapter","paper","wrong","bookmark","both"].map(m=>`<button class="mode" data-mode="${m}" aria-pressed="${homeMode===m}"><b>${MODES[m].name}</b><span class="small">${m==="chapter"?`${BANK.chapters.length} chapters`:m==="paper"?`${papersOf().length} papers`:`${poolN(m)} question${poolN(m)===1?"":"s"}`}</span></button>`).join("");
+  const EMPTY = {wrong:"No mistakes yet. Questions you get wrong in a test will appear here.", bookmark:"No bookmarks yet. Tap the bookmark button on a question to save it.", both:"No bookmarked or missed questions yet."};
+  let body;
+  if(homeMode==="chapter"){
+    body = `<h2 style="margin-top:1.4rem">Select a chapter</h2>` + units.map(u=>`
   <div class="unit"><h2>Unit ${esc(u.unit)} · ${esc(u.name)}</h2><span class="small">${u.marks} marks</span></div>
   ${u.items.map(c=>{ const s=chapterStats(c.n);
     const last = s.last ? `Last: ${s.last.score}/${s.last.total}` : "No tests yet";
     return `<div class="panel ch"><div class="chnum">${c.n}</div>
       <div><div class="nm">${esc(c.t)}</div><div class="st">${s.total} questions · seen ${s.seen} · ${last}</div>
       <div class="meter" aria-hidden="true"><i style="width:${pct(s.seen,s.total)}%"></i></div></div>
-      <button class="btn small" data-start="${c.n}" aria-label="Start test: ${esc(c.t)}">Start</button></div>`; }).join("")}`).join("")
-  + `<p class="small" style="text-align:center;margin-top:2rem">Board PYQ, version ${APP_VERSION}</p>`;
-  const setCount = n => { settings.count=Math.min(CFG.maxCount,Math.max(CFG.minCount,n)); document.getElementById("cnt").textContent=settings.count; persistSettings(); };
+      <button class="btn small" data-start="${c.n}" aria-label="Start test: ${esc(c.t)}">Start</button></div>`; }).join("")}`).join("");
+  } else if(homeMode==="paper"){
+    const all=papersOf(), groups=[]; all.forEach(p=>{ let g=groups.find(x=>x.year===p.year&&x.exam===p.exam); if(!g) groups.push(g={year:p.year,exam:p.exam,sets:[]}); g.sets.push(p); });
+    const sel=homePaper && groups.find(g=>g.year===homePaper.year&&g.exam===homePaper.exam);
+    body = `<h2 style="margin-top:1.4rem">Select a paper</h2>
+      <div class="subjbar" role="group" aria-label="Year and exam">${groups.map(g=>`<button data-py="${g.year}|${g.exam}" aria-pressed="${g===sel}">${g.year} ${EXAM[g.exam]||g.exam}</button>`).join("")}</div>`
+      + (sel ? `<p class="small" style="margin:0 0 .6rem">The whole paper in board order. It does not use the "questions per test" setting.</p>` + sel.sets.map(p=>{
+          const last=attempts.find(a=>attemptSubject(a)===subject && attemptMode(a)==="paper" && a.paper.year===p.year && a.paper.exam===p.exam && a.paper.code===p.code);
+          const miss=p.expected-p.items.length;
+          return `<div class="panel ch" style="grid-template-columns:1fr auto"><div><div class="nm">Set ${esc(p.code)}</div><div class="st">${p.items.length} questions${miss>0?` (${p.expected} in the paper, ${miss} left out)`:""} · ${last?`Last: ${last.score}/${last.total}`:"Not tried yet"}</div></div>
+            <button class="btn small" data-paper="${esc(p.year+"|"+p.exam+"|"+p.code)}" aria-label="Start paper ${esc(paperName(p))}">Start</button></div>`; }).join("")
+        : `<p class="sub">Choose a year and exam to see its sets.</p>`);
+  } else {
+    const n=poolN(homeMode);
+    body = `<div class="panel stack" style="margin-top:1rem"><h3>${esc(MODES[homeMode].name)}</h3>
+      ${n ? `<p style="margin:0">${n} question${n===1?"":"s"} available. This test will use ${Math.min(n,settings.count)}, the ones you have seen least first.</p>
+      <button class="btn" id="startpool" style="align-self:flex-start">Start test</button>` : `<p style="margin:0" class="sub">${EMPTY[homeMode]}</p>`}</div>`;
+  }
+  app.innerHTML = headerHtml("Board PYQ",`Class 12 ${subjectName(subject)} · real board questions`) + subjectBar() + `
+  <div class="panel stack">
+    <div class="setrow"><span><b>Questions per test</b><br><span class="small">${CFG.minCount} to ${CFG.maxCount}</span></span>
+      <span class="stepper"><button id="dec" aria-label="Fewer questions">−</button><b id="cnt">${settings.count}</b><button id="inc" aria-label="More questions">+</button></span></div>
+    <div class="setrow"><span><b>Timer</b><br><span class="small">${CFG.secondsPerQuestion} s per question, whole test</span></span>
+      <span class="seg" role="group" aria-label="Timer"><button data-t="0" aria-pressed="${!settings.timerOn}">Off</button><button data-t="1" aria-pressed="${settings.timerOn}">On</button></span></div>
+  </div>
+  <h2 style="margin-top:1.4rem">What do you want to practise?</h2>
+  <div class="modes">${modeBtns}</div>
+  ${body}
+  <p class="small" style="text-align:center;margin-top:2rem">Board PYQ, version ${APP_VERSION}</p>`;
+  const setCount = n => { settings.count=Math.min(CFG.maxCount,Math.max(CFG.minCount,n)); document.getElementById("cnt").textContent=settings.count; persistSettings(); if(homeMode!=="chapter") render(); };
   document.getElementById("dec").onclick=()=>setCount(settings.count-1);
   document.getElementById("inc").onclick=()=>setCount(settings.count+1);
   app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{ settings.timerOn=b.dataset.t==="1"; persistSettings(); render(); });
-  app.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>startTest(+b.dataset.start));
+  app.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{ homeMode=b.dataset.mode; render(); });
+  app.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>startTest("chapter",+b.dataset.start));
+  app.querySelectorAll("[data-py]").forEach(b=>b.onclick=()=>{ const [y,e]=b.dataset.py.split("|"); homePaper={year:+y,exam:e}; render(); });
+  app.querySelectorAll("[data-paper]").forEach(b=>b.onclick=()=>{ const [y,e,c]=b.dataset.paper.split("|"); startTest("paper",null,{year:+y,exam:e,code:c}); });
+  const sp=document.getElementById("startpool"); if(sp) sp.onclick=()=>startTest(homeMode);
 }
 
 /* ================= test ================= */
-function startTest(chapter){
-  const picked = pickQuestions(chapter, settings.count);
-  if(!picked.length) return;
+function startTest(mode, chapter=null, paper=null){
+  const pp = mode==="paper" ? findPaper(paper) : null;
+  const picked = pp ? pp.items.map(x=>x.q) : pickQuestions(mode, chapter, settings.count);
+  if(!picked.length){ notice=`No questions to practise in ${MODES[mode].name.toLowerCase()} right now.`; return go("home"); }
   const now = Date.now();
-  test = { chapter, qs:picked, idx:0, answers:{}, visited:new Set([picked[0].id]), review:new Set(), hint:new Set(), time:{}, shownHint:false,
+  test = { subject, mode, chapter, paper:pp&&{year:pp.year,exam:pp.exam,code:pp.code}, qs:picked, idx:0, answers:{}, visited:new Set([picked[0].id]), review:new Set(), hint:new Set(), time:{}, shownHint:false,
     startedAt:now, enteredAt:now, timerOn:settings.timerOn, limit: settings.timerOn ? picked.length*(CFG.secondsPerQuestion||90) : 0,
     paletteOpen:false, submitted:false };
   clearInterval(tick);
@@ -445,10 +549,11 @@ function paletteHtml(){
 function renderTest(){
   if(!test){ go("home"); return; }
   const q=test.qs[test.idx], last=test.idx===test.qs.length-1, sel=test.answers[q.id];
-  const ch=CHAPTER(test.chapter);
+  const label = test.mode==="chapter" ? CHAPTER(test.chapter).t : test.mode==="paper" ? paperName(test.paper) : MODES[test.mode].name, qch = CHAPTER(q.chapter);
+  const bmOn = !!bookmarks.ids[q.id];
   app.innerHTML = `
   <div class="testbar">
-    <div><b>${esc(ch.t)}</b><br><span class="small">Question ${test.idx+1} of ${test.qs.length}</span></div>
+    <div><b>${esc(label)}</b><br><span class="small">Question ${test.idx+1} of ${test.qs.length}</span></div>
     <div class="row">${test.timerOn?`<span class="timer" id="tm" role="timer">${mmss(timeLeft())}</span>`:""}
       <button class="btn ghost small palbtn" id="palbtn" aria-expanded="${test.paletteOpen}" aria-controls="pal">Questions ▾</button>
       <button class="btn ghost small" id="exit">Exit</button></div>
@@ -456,7 +561,9 @@ function renderTest(){
   <div class="layout">
     ${paletteHtml()}
     <div class="panel">
-      <div class="qhead"><span class="tag">${q.type==="ar"?"Assertion–Reason":"MCQ"}</span><button class="btn ghost small toggle" id="rv" aria-pressed="${test.review.has(q.id)}">${test.review.has(q.id)?"★ Marked for review":"☆ Mark for review"}</button></div>
+      <div class="qhead"><span class="row"><span class="tag">${q.type==="ar"?"Assertion–Reason":"MCQ"}</span>${test.mode!=="chapter"&&qch?`<span class="tag">Ch ${qch.n}</span>`:""}</span>
+        <span class="row"><button class="btn ghost small bm" id="bm" aria-pressed="${bmOn}" aria-label="${bmOn?"Remove bookmark":"Bookmark this question"}">${BM_ICON(bmOn)}${bmOn?"Bookmarked":"Bookmark"}</button>
+        <button class="btn ghost small toggle" id="rv" aria-pressed="${test.review.has(q.id)}">${test.review.has(q.id)?"★ Marked for review":"☆ Mark for review"}</button></span></div>
       <div class="qbox">${mathHtml(q.text)}</div>
       ${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure for question ${test.idx+1}">`:""}
       <div class="opts" role="group" aria-label="Options">${["A","B","C","D"].map(k=>q.options[k]==null?"":`<button class="opt" data-k="${k}" aria-pressed="${sel===k}"><span class="k">${k}</span><span class="ot">${mathHtml(q.options[k])}</span></button>`).join("")}</div>
@@ -476,6 +583,7 @@ function renderTest(){
   app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{ test.answers[q.id]=b.dataset.k; renderTest(); });
   const on=(id,fn)=>{ const el=document.getElementById(id); if(el) el.onclick=fn; };
   on("clear",()=>{ delete test.answers[q.id]; renderTest(); });
+  on("bm",async()=>{ await toggleBookmark(q.id); renderTest(); });
   on("rv",()=>{ test.review.has(q.id)?test.review.delete(q.id):test.review.add(q.id); renderTest(); });
   on("hint",()=>{ test.hint.add(q.id); test.shownHint=true; renderTest(); });
   on("prev",()=>jump(test.idx-1)); on("next",()=>jump(test.idx+1));
@@ -520,11 +628,11 @@ async function finishTest(timedOut){
   const items = t.qs.filter(q=>t.answers[q.id]!=null).map(q=>{ const ch=t.answers[q.id]; return {id:q.id, chosen:ch==null?null:ch, correct:ch===q.answer, timeSec:Math.round((t.time[q.id]||0)*10)/10, hintUsed:t.hint.has(q.id), review:t.review.has(q.id)}; });
   const score = items.filter(i=>i.correct).length, total=items.length;
   const award = awardFor(pct(score,total));
-  const attempt = {chapter:t.chapter, startedAt:t.startedAt, finishedAt, count:asked, timerOn:t.timerOn, timeLimitSec:t.limit, timedOut:!!timedOut, score, total, award:award.key, items};
+  const attempt = {subject:t.subject, mode:t.mode, chapter:t.mode==="chapter"?t.chapter:null, ...(t.mode==="paper"?{paper:t.paper}:{}), startedAt:t.startedAt, finishedAt, count:asked, timerOn:t.timerOn, timeLimitSec:t.limit, timedOut:!!timedOut, score, total, award:award.key, items};
   // stats
   const day=todayStr();
   for(const it of items){
-    stats.seen[it.id]=(stats.seen[it.id]||0)+1;
+    if(t.mode!=="paper") stats.seen[it.id]=(stats.seen[it.id]||0)+1;   // paper practice leaves the chapter rotation alone
     if(it.correct){
       if(stats.wrong[it.id]){
         stats.correctStreak[it.id]=(stats.correctStreak[it.id]||0)+1;
@@ -548,10 +656,10 @@ async function finishTest(timedOut){
 
 /* ================= result ================= */
 function renderResult(){
-  const a=view.attempt, ch=CHAPTER(a.chapter), award=awardByKey(a.award);
+  const a=view.attempt, award=awardByKey(a.award);
   const spent=a.items.reduce((s,i)=>s+(i.timeSec||0),0), avg=spent/Math.max(1,a.items.length);
   const wrongN=a.items.filter(i=>i.chosen!=null&&!i.correct).length, skipN=a.items.filter(i=>i.chosen==null).length;
-  app.innerHTML = headerHtml("Result", `${ch.t} · ${fmtWhen(a)}`) +
+  app.innerHTML = headerHtml("Result", `${attemptLabel(a)} · ${fmtWhen(a)}`) +
   (view.timedOut||a.timedOut?`<p class="banner"><b>Time's up.</b> The test was submitted automatically.</p>`:"") +
   `<div class="panel"><div class="spread"><div class="score">${a.score}<small> / ${a.total}</small></div>
       <div class="award"><span class="em" aria-hidden="true">${award.icon}</span><div><b>${esc(award.name)}</b><br><span class="small">${pct(a.score,a.total)}%</span></div></div></div>
@@ -562,15 +670,16 @@ function renderResult(){
     const mine = it.chosen==null ? "Not answered" : `${it.chosen}. ${q.options[it.chosen]}`;
     return `<div class="panel rq ${it.correct?"good":""} ${slow?"slow":""}">
       <div class="spread"><b>Q${i+1}</b><span class="row"><span class="pill ${it.correct?"ok":"bad"}">${it.correct?"Correct":(it.chosen==null?"Not answered":"Wrong")}</span>
-        <span class="pill due" ${slow?"":'style="background:none;border-color:var(--line)"'}>${slow?"⏱ Took long · ":"⏱ "}${dur(it.timeSec)}</span>${it.hintUsed?'<span class="tag">Hint used</span>':""}</span></div>
+        <span class="pill due" ${slow?"":'style="background:none;border-color:var(--line)"'}>${slow?"⏱ Took long · ":"⏱ "}${dur(it.timeSec)}</span>${it.hintUsed?'<span class="tag">Hint used</span>':""}${role==="student"?`<button class="btn ghost small bm" data-bm="${esc(q.id)}" aria-pressed="${!!bookmarks.ids[q.id]}" aria-label="${bookmarks.ids[q.id]?"Remove bookmark":"Bookmark this question"}">${BM_ICON(!!bookmarks.ids[q.id])}</button>`:(bookmarks.ids[q.id]?`<span class="bmtag">${BM_ICON(true)}Bookmarked</span>`:"")}</span></div>
       <div class="qbox">${mathHtml(q.text)}</div>
       ${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure for question ${i+1}">`:""}
       <p style="margin:.3rem 0"><b>Her answer:</b> <span style="color:${it.correct?"var(--ok)":"var(--bad)"}">${it.chosen==null?"Not answered":esc(it.chosen)+". "+mathHtml(q.options[it.chosen])}</span></p>
       ${it.correct?"":`<p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>`}
       <div class="ex">${mathHtml(q.explanation||"")}${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>
       <div class="src">${esc(sourceLine(q))}</div></div>`; }).join("")}
-  <div class="row" style="margin-top:1rem">${role==="student"?`<button class="btn" id="again">Practice again</button>`:""}<button class="btn ghost" id="back">${view.from==="progress"?"Back to progress":(role==="student"?"Back to chapters":"Back")}</button></div>`;
-  const again=document.getElementById("again"); if(again) again.onclick=()=>startTest(a.chapter);
+  <div class="row" style="margin-top:1rem">${role==="student"?`<button class="btn" id="again">Practice again</button>`:""}<button class="btn ghost" id="back">${view.from==="progress"?"Back to progress":(role==="student"?"Back to practice":"Back")}</button></div>`;
+  const again=document.getElementById("again"); if(again) again.onclick=()=>{ setSubject(attemptSubject(a)); startTest(attemptMode(a), a.chapter, a.paper); };
+  app.querySelectorAll("[data-bm]").forEach(b=>b.onclick=async()=>{ await toggleBookmark(b.dataset.bm); const on=!!bookmarks.ids[b.dataset.bm]; b.setAttribute("aria-pressed",on); b.setAttribute("aria-label",on?"Remove bookmark":"Bookmark this question"); b.innerHTML=BM_ICON(on); });
   document.getElementById("back").onclick=()=>go(view.from==="progress"||role==="parent"?"progress":"home");
 }
 function celebrate(award){
@@ -595,26 +704,32 @@ function renderProgress(){
     const t=items.reduce((x,i)=>x+(i.timeSec||0),0);
     return {c, s, acc: items.length?pct(right,items.length):null, avg: items.length? t/items.length : null}; });
   const done = rows.filter(r=>r.s.tests);
-  app.innerHTML = headerHtml("Progress", `${attempts.length} test${attempts.length===1?"":"s"} so far`) +
+  const A = attempts.filter(a=>attemptSubject(a)===subject);
+  const bms = BANK.questions.filter(q=>bookmarks.ids[q.id]).sort((x,y)=>bookmarks.ids[y.id]-bookmarks.ids[x.id]);
+  app.innerHTML = headerHtml("Progress", `${A.length} ${subjectName(subject)} test${A.length===1?"":"s"} so far`) + subjectBar() +
   (done.length ? `<div class="panel tblwrap"><table class="tbl"><thead><tr><th>Chapter</th><th>Tests</th><th>Best</th><th>Last</th><th>Last taken</th><th>Accuracy</th><th>Avg time</th><th>Seen</th>${role==="parent"?"<th></th>":""}</tr></thead><tbody>
     ${done.map(r=>`<tr><td>${r.c.n}. ${esc(r.c.t)}</td><td>${r.s.tests}</td><td>${r.s.best}%</td><td>${r.s.last.score}/${r.s.last.total}</td><td>${fmtDate(r.s.last.finishedAt||r.s.last.startedAt)}</td><td>${r.acc}%</td><td>${dur(r.avg)}</td><td>${r.s.seen}/${r.s.total}</td>${role==="parent"?`<td><button class="btn ghost small" data-clear="${r.c.n}" aria-label="Clear results for ${esc(r.c.t)}">Clear</button></td>`:""}</tr>`).join("")}</tbody></table></div>`
     : `<p class="panel">No tests yet.</p>`) +
-  `<h2>Past tests</h2>` + (attempts.length ? attempts.map((a,i)=>{ const aw=awardByKey(a.award);
-    return `<button class="att" data-a="${i}"><span><b>${a.score}/${a.total}</b> · ${esc(CHAPTER(a.chapter).t)}<br><span class="small">${fmtWhen(a)}${a.timerOn?" · timed":""}${a.timedOut?" · time's up":""}</span></span><span style="font-size:1.8rem" aria-hidden="true">${aw.icon}</span></button>`; }).join("") : `<p class="small">Nothing here yet.</p>`);
-  app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"progress"}));
+  `<h2>Past tests</h2>` + (A.length ? A.map((a,i)=>{ const aw=awardByKey(a.award);
+    return `<button class="att" data-a="${i}"><span><b>${a.score}/${a.total}</b> · ${esc(attemptLabel(a))}<br><span class="small">${fmtWhen(a)}${a.timerOn?" · timed":""}${a.timedOut?" · time's up":""}</span></span><span style="font-size:1.8rem" aria-hidden="true">${aw.icon}</span></button>`; }).join("") : `<p class="small">Nothing here yet.</p>`) +
+  (role==="parent" ? `<h2>Bookmarked questions</h2>` + (bms.length ? bms.map(q=>`<div class="panel rq" style="border-left-color:var(--pink)"><div class="spread"><span class="tag">Ch ${q.chapter}${q.type==="ar"?" · Assertion–Reason":""}</span><span class="bmtag">${BM_ICON(true)}Bookmarked</span></div>
+      <div class="qbox">${mathHtml(q.text)}</div>${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure">`:""}
+      <p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>
+      <div class="src">${esc(sourceLine(q))}</div></div>`).join("") : `<p class="small">No bookmarks yet.</p>`) : "");
+  app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:A[+b.dataset.a], from:"progress"}));
   app.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{ const n=+b.dataset.clear;
     confirmBox("Clear this chapter?", `All tests, awards and seen/missed history for "${CHAPTER(n).t}" will be deleted so ${studentName()} can start over. This cannot be undone.`, "Clear results", "Cancel", ()=>clearChapter(n), true); });
 }
 async function clearChapter(n){
   if(role!=="parent") return;
-  const ids=new Set(qsOfChapter(n).map(q=>q.id)), gone=attempts.filter(a=>a.chapter===n);
+  const ids=new Set(qsOfChapter(n).map(q=>q.id)), gone=attempts.filter(a=>attemptSubject(a)===subject && a.chapter===n);
   try{
     const st = Object.assign(blankStats(), (await store.getStats())||{});
     for(const k of ["seen","wrong","correctStreak"]) for(const id of Object.keys(st[k]||{})) if(ids.has(id)) delete st[k][id];
     st.updatedAt=Date.now();
     await store.deleteAttempts(gone.map(a=>a.id));
     await store.saveStats(st);
-    stats=st; attempts=attempts.filter(a=>a.chapter!==n); saveErr="";
+    stats=st; attempts=attempts.filter(a=>!(attemptSubject(a)===subject && a.chapter===n)); saveErr="";
     notice=`Cleared "${CHAPTER(n).t}".`;
   }catch(e){ console.error(e); saveErr="Could not clear. Check your internet connection and try again."; }
   render();
@@ -624,7 +739,7 @@ function renderAwards(){
   app.innerHTML = headerHtml("My awards", `${attempts.length} earned`) +
   (attempts.length ? `<div class="row" style="margin-bottom:1rem">${CFG.awards.filter(a=>counts[a.key]).map(a=>`<span class="pill due">${a.icon} ${counts[a.key]}</span>`).join("")}</div>
     <div class="badges">${attempts.map((a,i)=>{ const aw=awardByKey(a.award);
-      return `<button class="badge" data-a="${i}" style="font:inherit;color:inherit;cursor:pointer"><span aria-hidden="true">${aw.icon}</span><b>${esc(aw.name)}</b><small>${a.score}/${a.total} · Ch ${a.chapter}</small><small>${fmtDate(a.startedAt)}</small><small>${fmtTime(a.startedAt)} – ${a.finishedAt?fmtTime(a.finishedAt):""}</small></button>`; }).join("")}</div>`
+      return `<button class="badge" data-a="${i}" style="font:inherit;color:inherit;cursor:pointer"><span aria-hidden="true">${aw.icon}</span><b>${esc(aw.name)}</b><small>${a.score}/${a.total} · ${esc((SUBJECTS.length>1?subjectName(attemptSubject(a))+" ":"")+attemptShort(a))}</small><small>${fmtDate(a.startedAt)}</small><small>${fmtTime(a.startedAt)} – ${a.finishedAt?fmtTime(a.finishedAt):""}</small></button>`; }).join("")}</div>`
     : `<p class="panel">Finish a test to earn your first award.</p>`);
   app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:attempts[+b.dataset.a], from:"awards"}));
 }

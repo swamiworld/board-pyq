@@ -21,6 +21,18 @@ window.APP_CONFIG = {
   ],
   parentEmails: ["swamiworld@gmail.com"],
 
+  // Subjects. `bank` is the window variable set by that subject's question file (questions.js sets window.PYQ).
+  // A subject shows up in the app only once its bank is loaded: add its <script> tag in index.html.
+  // paperSize = questions in a full Section A, used to show how many a paper is missing.
+  // Question ids must be unique across all banks (Maths uses m0001...; use p, c, s, e prefixes for the others).
+  subjects: [
+    { key: "maths",    name: "Maths",            bank: "PYQ", paperSize: 20 },
+    { key: "physics",  name: "Physics",          bank: "PYQ_PHYSICS" },
+    { key: "chemistry",name: "Chemistry",        bank: "PYQ_CHEMISTRY" },
+    { key: "cs",       name: "Computer Science", bank: "PYQ_CS" },
+    { key: "english",  name: "English",          bank: "PYQ_ENGLISH" }
+  ],
+
   // Test defaults and limits
   defaults: { count: 10, timerOn: false },
   minCount: 5,

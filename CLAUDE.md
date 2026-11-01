@@ -35,14 +35,17 @@ window.PYQ = { version, subject, class, chapters: [{n, t, unit, unitName, unitMa
 - Assertion–Reason (`type:"ar"`) options are the standard four statements; show them like any other options.
 - **Ids are permanent.** Progress is stored by id. Never renumber, reuse or delete an id; new questions get new ids.
 - One question can have several sources: the same question appeared in several sets or years. Show all of them, e.g. "2024 Regular · 65/2/1 Q7 · also 65/2/3 Q12".
-- Chapters (13) and their question counts are in `PYQ.chapters`; group the chapter picker by unit and show unit marks (Unit III Calculus 35 marks, and so on).
+- Chapters and their question counts (13 for Maths) are in `PYQ.chapters`; group the chapter picker by unit and show unit marks (Unit III Calculus 35 marks, and so on).
 
 ## Subjects, practice modes, bookmarks
+- Live subjects: Maths (`questions.js`, 778 questions, m-ids) and Physics (`questions_physics.js`, `window.PYQ_PHYSICS`, 802 questions p0001–p0802, 14 chapters, 74 figures `figures/p*.png`, `data/excluded_physics.json` lists 23 left out: do not add them back, `review_physics.html`). Chemistry (c-ids), Computer Science (s-ids) and English (e-ids, top-level `passages`) are to follow; the app does not yet render `passages` or code fences.
+- Physics QP codes include `55(B)`, `55(B)/S`, `55/C/B` etc. (visually impaired papers); shown as printed. Physics papers have 15 to 18 questions, so `paperSize` is not set for it.
+- Unit marks: Physics gives marks per pair of units (I–II 16 …), so the chapter picker merges adjacent units with the same `unitMarks` into one heading ("Units I–II · 16 marks").
 - `config.subjects` lists Maths, Physics, Chemistry, Computer Science, English; each has a `bank` (window variable). A subject appears in the app only when its bank file is loaded: add a `<script src>` for it in `index.html`. Question ids must be unique across all banks (Maths `m…`; use `p`, `c`, `s`, `e` prefixes).
 - Attempts carry `subject` (missing = Maths) and `mode` (`chapter` | `wrong` | `bookmark` | `both`, missing = chapter); `chapter` is null unless mode is `chapter`. `seen`, `wrong` and bookmarks are keyed by question id, so they work across subjects.
 - Practice tab: choose Chapters (then pick one chapter), Mistakes, Bookmarked, or Bookmarked + mistakes (union). The last three draw from all chapters of the current subject, lowest `seen` first.
 - Past papers: a fifth mode, built from `sources` (a paper = year + exam + QP code). Pick a year and exam, then a set. The whole paper is used in board order, ignoring "questions per test". Attempts get `mode: "paper"` and `paper: {year, exam, code}`. Paper tests update `wrong` and `correctStreak` but never `seen`. Papers missing a question show "N in the paper, M left out" (set `paperSize` per subject in `config.js`).
-- Bookmarks: `pyq/{email}/state/bookmarks` = `{ids: {qid: ms}, updatedAt}`. Student toggles on the test and result screens; the parent sees them read-only on Progress. Covered by the existing `pyq/{email}/{document=**}` rule.
+- Bookmarks: `pyq/{email}/state/bookmarks` = `{ids: {qid: ms}, updatedAt}`. Student toggles on the test and result screens; the parent sees them read-only on Progress. Needs its own `match /pyq/{email}/state/bookmarks` rule in `..\study-desk\firestore.rules` (the rules there are per document, not a wildcard); student read/write, parent read.
 
 ## Users and roles
 - Student: `dharshiniworld@gmail.com` (Dharshini). Parent (read-only): `swamiworld@gmail.com`. Keep these in `config.js` (`students`, `parentEmails`), lowercase. Any other Google account is signed out with a message.

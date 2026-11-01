@@ -196,6 +196,7 @@ nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 
 </style>
 <script src="config.js?v=2026-11-01"></script>
 <script src="questions.js"></script>
+<script src="questions_physics.js"></script>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"><p class="sub">Loading…</p></div>
@@ -364,7 +365,7 @@ const studentName = () => (kids.find(x=>x.email===currentStudent)||{name:"Studen
 
 async function loadAll(){
   try{
-    const [s,st,at,bm] = await Promise.all([store.getSettings(), store.getStats(), store.listAttempts(), store.getBookmarks()]);
+    const [s,st,at,bm] = await Promise.all([store.getSettings(), store.getStats(), store.listAttempts(), store.getBookmarks().catch(e=>{ console.warn("bookmarks not loaded", e); return null; })]);
     settings = Object.assign({}, CFG.defaults, s||{});
     stats = Object.assign(blankStats(), st||{});
     attempts = at||[];
@@ -463,15 +464,17 @@ function chapterStats(n){
   return {total:all.length, seen, tests:list.length, last:list[0]||null, best:list.reduce((m,a)=>Math.max(m,pct(a.score,a.total)),0), list};
 }
 function renderHome(){
+  // Group by unit. CBSE gives marks per pair of units in Physics (e.g. I-II 16), so adjacent units with the same marks share one heading.
   const units = []; BANK.chapters.forEach(c=>{ let u=units.find(x=>x.unit===c.unit); if(!u){ u={unit:c.unit,name:c.unitName,marks:c.unitMarks,items:[]}; units.push(u); } u.items.push(c); });
+  const groups = []; units.forEach(u=>{ const g=groups[groups.length-1]; if(g && g.marks===u.marks){ g.units.push(u); } else groups.push({marks:u.marks, units:[u]}); });
   const poolN = m => poolFor(m).length;
   const modeBtns = ["chapter","paper","wrong","bookmark","both"].map(m=>`<button class="mode" data-mode="${m}" aria-pressed="${homeMode===m}"><b>${MODES[m].name}</b><span class="small">${m==="chapter"?`${BANK.chapters.length} chapters`:m==="paper"?`${papersOf().length} papers`:`${poolN(m)} question${poolN(m)===1?"":"s"}`}</span></button>`).join("");
   const EMPTY = {wrong:"No mistakes yet. Questions you get wrong in a test will appear here.", bookmark:"No bookmarks yet. Tap the bookmark button on a question to save it.", both:"No bookmarked or missed questions yet."};
   let body;
   if(homeMode==="chapter"){
-    body = `<h2 style="margin-top:1.4rem">Select a chapter</h2>` + units.map(u=>`
-  <div class="unit"><h2>Unit ${esc(u.unit)} · ${esc(u.name)}</h2><span class="small">${u.marks} marks</span></div>
-  ${u.items.map(c=>{ const s=chapterStats(c.n);
+    body = `<h2 style="margin-top:1.4rem">Select a chapter</h2>` + groups.map(g=>`
+  <div class="unit"><h2>${g.units.length>1?"Units "+esc(g.units[0].unit)+"–"+esc(g.units[g.units.length-1].unit):"Unit "+esc(g.units[0].unit)} · ${g.units.map(u=>esc(u.name)).join(" / ")}</h2><span class="small">${g.marks} marks</span></div>
+  ${g.units.flatMap(u=>u.items).map(c=>{ const s=chapterStats(c.n);
     const last = s.last ? `Last: ${s.last.score}/${s.last.total}` : "No tests yet";
     return `<div class="panel ch"><div class="chnum">${c.n}</div>
       <div><div class="nm">${esc(c.t)}</div><div class="st">${s.total} questions · seen ${s.seen} · ${last}</div>

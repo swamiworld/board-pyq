@@ -844,7 +844,7 @@ async function startAs(r){
 }
 async function startParent(email){
   myEmail=email; isAdmin=email===ADMIN;
-  await roster.seed();
+  if(isAdmin) await roster.seed();   // the seed reads the config.js students, which only the admin may do
   kids=await roster.kidsOf(email);
   let last=null; try{ last=localStorage.getItem("board-pyq-parent-student"); }catch(e){}
   currentStudent=(kids.find(k=>k.email===last)||kids[0]||{}).email||null;

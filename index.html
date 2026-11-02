@@ -473,11 +473,19 @@ function render(){
   else renderHome();
   renderNav(); bindHeader();
 }
+// Google blocks or breaks sign-in inside the built-in browsers of chat apps (Teams, WhatsApp, Instagram...).
+const IN_APP = /Teams\/|TeamsMobile|MicrosoftTeams|FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|LinkedInApp|Snapchat|Twitter|; wv\)/i.test(navigator.userAgent);
 function showLogin(msg){
   setWide(false); document.getElementById("navhost").innerHTML="";
   app.innerHTML = `<div class="login"><div><h1>Board PYQ</h1><p class="sub">Real board-exam MCQs, chapter by chapter.</p></div>
-    ${msg?`<p class="banner">${esc(msg)}</p>`:""}<button class="btn" id="gsign">Sign in with Google</button></div>`;
+    ${msg?`<p class="banner">${esc(msg)}</p>`:""}
+    ${IN_APP?`<div class="banner" id="inapp"><b>Open this page in your browser to sign in.</b><br>Google does not allow sign-in inside Teams, WhatsApp and similar apps. Open the link in Chrome, Edge or Safari (in Teams: ⋯ on the link, then "Open in browser").<br><button class="btn small" id="copylink" style="margin-top:.5rem">Copy link</button> <span class="small" id="copied" aria-live="polite"></span></div>`:""}
+    <button class="btn" id="gsign">Sign in with Google</button></div>`;
   document.getElementById("gsign").onclick=()=>authApi.signIn();
+  const cl=document.getElementById("copylink");
+  if(cl) cl.onclick=async()=>{ const done=m=>{ document.getElementById("copied").textContent=m; };
+    try{ await navigator.clipboard.writeText(location.origin+location.pathname); done("Link copied. Paste it into your browser."); }
+    catch(e){ done("Copy this address: "+location.origin+location.pathname); } };
 }
 
 /* ================= home ================= */
@@ -871,7 +879,7 @@ async function boot(){
         const st=await roster.getStudent(email);
         if(st){ myEmail=email; currentStudent=email; kids=[{email,name:st.name}]; store=await makeStore(email); return startAs("student"); }
         if(await roster.getParent(email)) return await startParent(email);
-      }catch(e){ console.error(e); loginMsg="Could not check your account. Check your internet connection and try again."; await au.signOut(auth); return; }
+      }catch(e){ console.error(e); loginMsg=`Could not check your account (${e&&e.code||"error"}, signed in as ${email}${user.emailVerified?"":", email not verified"}). Check your internet connection and try again.`; await au.signOut(auth); return; }
       loginMsg=`${email} is not set up for this app. Ask the admin to add this Google account.`;
       await au.signOut(auth);
     });

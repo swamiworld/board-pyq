@@ -23,13 +23,15 @@ window.APP_CONFIG = {
 
   // Subjects. `bank` is the window variable set by that subject's question file (questions.js sets window.PYQ).
   // A subject shows up in the app only once its bank is loaded: add its <script> tag in index.html.
+  // plainText = text is plain, not LaTeX (Computer Science): ``` fences are code blocks, `backticks` are inline code, a literal $ is allowed.
+  // pairedUnitMarks = CBSE gives marks per pair of adjacent units (Physics), so the picker shows one heading per pair.
   // paperSize = questions in a full Section A, used to show how many a paper is missing.
   // Question ids must be unique across all banks (Maths uses m0001...; use p, c, s, e prefixes for the others).
   subjects: [
     { key: "maths",    name: "Maths",            bank: "PYQ", paperSize: 20 },
-    { key: "physics",  name: "Physics",          bank: "PYQ_PHYSICS" },
+    { key: "physics",  name: "Physics",          bank: "PYQ_PHYSICS", pairedUnitMarks: true },
     { key: "chemistry",name: "Chemistry",        bank: "PYQ_CHEMISTRY" },
-    { key: "cs",       name: "Computer Science", bank: "PYQ_CS" },
+    { key: "cs",       name: "Computer Science", bank: "PYQ_CS", plainText: true },
     { key: "english",  name: "English",          bank: "PYQ_ENGLISH" }
   ],
 

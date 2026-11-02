@@ -179,6 +179,11 @@ nav.tabs button{background:none;border:0;padding:.7rem .2rem .8rem;font-weight:7
 nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
 .login{min-height:80vh;display:flex;flex-direction:column;justify-content:center;gap:1rem}
 .katex-display{margin:.4rem 0}
+/* code in Computer Science questions */
+.code{margin:.5rem 0;padding:.6rem .75rem;overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;font:400 .88rem/1.45 ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;white-space:pre;tab-size:4}
+.code code{font:inherit}
+code{font:500 .92em ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:0 .25em;white-space:pre-wrap}
+.code code{border:0;padding:0;background:none;white-space:pre}
 /* subjects, practice modes, bookmarks */
 .subjbar{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 0 1rem}
 .subjbar button{border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-weight:700;border-radius:999px;padding:.35rem .9rem;min-height:2.4rem}
@@ -197,6 +202,8 @@ nav.tabs button[aria-current="page"]{color:var(--accent);box-shadow:inset 0 3px 
 <script src="config.js?v=2026-11-01"></script>
 <script src="questions.js"></script>
 <script src="questions_physics.js"></script>
+<script src="questions_chemistry.js"></script>
+<script src="questions_cs.js"></script>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"><p class="sub">Loading…</p></div>
@@ -242,7 +249,23 @@ function mathHtml(s){
     return window.katex.renderToString(part,{throwOnError:false});
   }).join("");
 }
+// Plain-text banks (Computer Science): no LaTeX, so a literal $ is safe. ```fenced``` blocks become <pre>, `inline` becomes <code>.
+function plainHtml(s){
+  s=String(s==null?"":s);
+  const inline=x=>x.split("`").map((part,i)=>i%2===0 ? esc(part).replace(/\n/g,"<br>") : `<code>${esc(part)}</code>`).join("");
+  let out="", last=0, m; const re=/```[^\n`]*\n?([\s\S]*?)```/g;
+  while((m=re.exec(s))){
+    out += inline(s.slice(last,m.index).replace(/\n$/,"")) + `<pre class="code"><code>${esc(m[1].replace(/\n$/,""))}</code></pre>`;
+    last = re.lastIndex; if(s[last]==="\n") last++;
+  }
+  return out + inline(s.slice(last));
+}
+const SUBJ_OF = new Map();   // question id -> subject key
+const isPlain = q => { const s=SUBJECTS.find(x=>x.key===SUBJ_OF.get(q.id)); return !!(s && s.plainText); };
+// Renders any text field of question q the way its subject needs (KaTeX for science and maths, plain for CS).
+const qh = (q, s) => isPlain(q) ? plainHtml(s) : mathHtml(s);
 const BYID = new Map(Object.values(BANKS).flatMap(b=>b.questions.map(q=>[q.id,q])));
+SUBJECTS.forEach(s=>BANKS[s.key].questions.forEach(q=>SUBJ_OF.set(q.id,s.key)));
 const CHAPTER = (n, subj=subject) => BANKS[subj].chapters.find(c=>c.n===n);
 const qsOfChapter = n => BANK.questions.filter(q=>q.chapter===n);
 // What a test was drawn from: one chapter, her mistakes, her bookmarks, or both.
@@ -464,9 +487,10 @@ function chapterStats(n){
   return {total:all.length, seen, tests:list.length, last:list[0]||null, best:list.reduce((m,a)=>Math.max(m,pct(a.score,a.total)),0), list};
 }
 function renderHome(){
-  // Group by unit. CBSE gives marks per pair of units in Physics (e.g. I-II 16), so adjacent units with the same marks share one heading.
+  // Group by unit. CBSE gives marks per pair of units in Physics (e.g. I-II 16), so subjects with `pairedUnitMarks` in config.js share one heading per pair.
   const units = []; BANK.chapters.forEach(c=>{ let u=units.find(x=>x.unit===c.unit); if(!u){ u={unit:c.unit,name:c.unitName,marks:c.unitMarks,items:[]}; units.push(u); } u.items.push(c); });
-  const groups = []; units.forEach(u=>{ const g=groups[groups.length-1]; if(g && g.marks===u.marks){ g.units.push(u); } else groups.push({marks:u.marks, units:[u]}); });
+  const pairedMarks = !!(SUBJECTS.find(s=>s.key===subject)||{}).pairedUnitMarks;
+  const groups = []; units.forEach(u=>{ const g=groups[groups.length-1]; if(g && pairedMarks && g.marks===u.marks){ g.units.push(u); } else groups.push({marks:u.marks, units:[u]}); });
   const poolN = m => poolFor(m).length;
   const modeBtns = ["chapter","paper","wrong","bookmark","both"].map(m=>`<button class="mode" data-mode="${m}" aria-pressed="${homeMode===m}"><b>${MODES[m].name}</b><span class="small">${m==="chapter"?`${BANK.chapters.length} chapters`:m==="paper"?`${papersOf().length} papers`:`${poolN(m)} question${poolN(m)===1?"":"s"}`}</span></button>`).join("");
   const EMPTY = {wrong:"No mistakes yet. Questions you get wrong in a test will appear here.", bookmark:"No bookmarks yet. Tap the bookmark button on a question to save it.", both:"No bookmarked or missed questions yet."};
@@ -564,13 +588,13 @@ function renderTest(){
   <div class="layout">
     ${paletteHtml()}
     <div class="panel">
-      <div class="qhead"><span class="row"><span class="tag">${q.type==="ar"?"Assertion–Reason":"MCQ"}</span>${test.mode!=="chapter"&&qch?`<span class="tag">Ch ${qch.n}</span>`:""}</span>
+      <div class="qhead"><span class="row"><span class="tag">${q.type==="ar"?"Assertion–Reason":q.type==="tf"?"True / False":"MCQ"}</span>${test.mode!=="chapter"&&qch?`<span class="tag">Ch ${qch.n}</span>`:""}</span>
         <span class="row"><button class="btn ghost small bm" id="bm" aria-pressed="${bmOn}" aria-label="${bmOn?"Remove bookmark":"Bookmark this question"}">${BM_ICON(bmOn)}${bmOn?"Bookmarked":"Bookmark"}</button>
         <button class="btn ghost small toggle" id="rv" aria-pressed="${test.review.has(q.id)}">${test.review.has(q.id)?"★ Marked for review":"☆ Mark for review"}</button></span></div>
-      <div class="qbox">${mathHtml(q.text)}</div>
+      <div class="qbox">${qh(q, q.text)}</div>
       ${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure for question ${test.idx+1}">`:""}
-      <div class="opts" role="group" aria-label="Options">${["A","B","C","D"].map(k=>q.options[k]==null?"":`<button class="opt" data-k="${k}" aria-pressed="${sel===k}"><span class="k">${k}</span><span class="ot">${mathHtml(q.options[k])}</span></button>`).join("")}</div>
-      <div id="hintslot">${test.shownHint?`<div class="hintbox">${mathHtml(q.hint||"No hint for this one.")}</div>`:""}</div>
+      <div class="opts" role="group" aria-label="Options">${["A","B","C","D"].map(k=>q.options[k]==null?"":`<button class="opt" data-k="${k}" aria-pressed="${sel===k}"><span class="k">${k}</span><span class="ot">${qh(q, q.options[k])}</span></button>`).join("")}</div>
+      <div id="hintslot">${test.shownHint?`<div class="hintbox">${qh(q, q.hint||"No hint for this one.")}</div>`:""}</div>
       <div class="src">${esc(sourceLine(q))}</div>
       <div class="navrow">
         <button class="btn ghost" id="prev" ${test.idx===0?"disabled":""}>← Previous</button>
@@ -674,11 +698,11 @@ function renderResult(){
     return `<div class="panel rq ${it.correct?"good":""} ${slow?"slow":""}">
       <div class="spread"><b>Q${i+1}</b><span class="row"><span class="pill ${it.correct?"ok":"bad"}">${it.correct?"Correct":(it.chosen==null?"Not answered":"Wrong")}</span>
         <span class="pill due" ${slow?"":'style="background:none;border-color:var(--line)"'}>${slow?"⏱ Took long · ":"⏱ "}${dur(it.timeSec)}</span>${it.hintUsed?'<span class="tag">Hint used</span>':""}${role==="student"?`<button class="btn ghost small bm" data-bm="${esc(q.id)}" aria-pressed="${!!bookmarks.ids[q.id]}" aria-label="${bookmarks.ids[q.id]?"Remove bookmark":"Bookmark this question"}">${BM_ICON(!!bookmarks.ids[q.id])}</button>`:(bookmarks.ids[q.id]?`<span class="bmtag">${BM_ICON(true)}Bookmarked</span>`:"")}</span></div>
-      <div class="qbox">${mathHtml(q.text)}</div>
+      <div class="qbox">${qh(q, q.text)}</div>
       ${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure for question ${i+1}">`:""}
-      <p style="margin:.3rem 0"><b>Her answer:</b> <span style="color:${it.correct?"var(--ok)":"var(--bad)"}">${it.chosen==null?"Not answered":esc(it.chosen)+". "+mathHtml(q.options[it.chosen])}</span></p>
-      ${it.correct?"":`<p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>`}
-      <div class="ex">${mathHtml(q.explanation||"")}${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>
+      <p style="margin:.3rem 0"><b>Her answer:</b> <span style="color:${it.correct?"var(--ok)":"var(--bad)"}">${it.chosen==null?"Not answered":esc(it.chosen)+". "+qh(q, q.options[it.chosen])}</span></p>
+      ${it.correct?"":`<p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${qh(q, q.options[q.answer])}</span></p>`}
+      <div class="ex">${qh(q, q.explanation||"")}${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>
       <div class="src">${esc(sourceLine(q))}</div></div>`; }).join("")}
   <div class="row" style="margin-top:1rem">${role==="student"?`<button class="btn" id="again">Practice again</button>`:""}<button class="btn ghost" id="back">${view.from==="progress"?"Back to progress":(role==="student"?"Back to practice":"Back")}</button></div>`;
   const again=document.getElementById("again"); if(again) again.onclick=()=>{ setSubject(attemptSubject(a)); startTest(attemptMode(a), a.chapter, a.paper); };
@@ -716,8 +740,8 @@ function renderProgress(){
   `<h2>Past tests</h2>` + (A.length ? A.map((a,i)=>{ const aw=awardByKey(a.award);
     return `<button class="att" data-a="${i}"><span><b>${a.score}/${a.total}</b> · ${esc(attemptLabel(a))}<br><span class="small">${fmtWhen(a)}${a.timerOn?" · timed":""}${a.timedOut?" · time's up":""}</span></span><span style="font-size:1.8rem" aria-hidden="true">${aw.icon}</span></button>`; }).join("") : `<p class="small">Nothing here yet.</p>`) +
   (role==="parent" ? `<h2>Bookmarked questions</h2>` + (bms.length ? bms.map(q=>`<div class="panel rq" style="border-left-color:var(--pink)"><div class="spread"><span class="tag">Ch ${q.chapter}${q.type==="ar"?" · Assertion–Reason":""}</span><span class="bmtag">${BM_ICON(true)}Bookmarked</span></div>
-      <div class="qbox">${mathHtml(q.text)}</div>${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure">`:""}
-      <p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${mathHtml(q.options[q.answer])}</span></p>
+      <div class="qbox">${qh(q, q.text)}</div>${q.figure?`<img class="qfig" src="${esc(q.figure)}" alt="Figure">`:""}
+      <p style="margin:.3rem 0"><b>Correct answer:</b> <span style="color:var(--ok)">${esc(q.answer)}. ${qh(q, q.options[q.answer])}</span></p>
       <div class="src">${esc(sourceLine(q))}</div></div>`).join("") : `<p class="small">No bookmarks yet.</p>`) : "");
   app.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>go("result",{attempt:A[+b.dataset.a], from:"progress"}));
   app.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{ const n=+b.dataset.clear;
